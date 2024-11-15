@@ -5,28 +5,27 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/field"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"github.com/spf13/viper"
-	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	"go.uber.org/zap"
 )
 
-var version = "dev"
+var (
+	version       = "dev"
+	connectorName = "baton-hashicorp-vault"
+)
 
 func main() {
 	ctx := context.Background()
-
 	_, cmd, err := config.DefineConfiguration(
 		ctx,
-		"baton-hashicorp-vault",
+		connectorName,
 		getConnector,
-		field.Configuration{
-			Fields: ConfigurationFields,
-		},
+		Configurations,
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -34,7 +33,6 @@ func main() {
 	}
 
 	cmd.Version = version
-
 	err = cmd.Execute()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
