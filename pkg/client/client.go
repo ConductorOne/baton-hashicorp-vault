@@ -41,9 +41,9 @@ func isValidUrl(baseUrl string) bool {
 	return err == nil && u.Scheme != "" && u.Host != ""
 }
 
-func New(ctx context.Context, freshServiceClient *HCPClient) (*HCPClient, error) {
+func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	var (
-		clientToken = freshServiceClient.getToken()
+		clientToken = hcpClient.getToken()
 		baseUrl     = "http://127.0.0.1:8200/v1/auth"
 	)
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
@@ -53,11 +53,11 @@ func New(ctx context.Context, freshServiceClient *HCPClient) (*HCPClient, error)
 
 	cli, err := uhttp.NewBaseHttpClientWithContext(context.Background(), httpClient)
 	if err != nil {
-		return freshServiceClient, err
+		return hcpClient, err
 	}
 
-	if freshServiceClient.baseUrl != "" {
-		baseUrl = freshServiceClient.baseUrl
+	if hcpClient.baseUrl != "" {
+		baseUrl = hcpClient.baseUrl
 	}
 
 	if !isValidUrl(baseUrl) {
