@@ -114,12 +114,12 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) ([]strin
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass
 func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*UsersAPIData, Page, error) {
-	agentsUrl, err := url.JoinPath(h.baseUrl, "userpass/users")
+	usersUrl, err := url.JoinPath(h.baseUrl, "userpass/users")
 	if err != nil {
 		return nil, Page{}, err
 	}
 
-	uri, err := url.Parse(agentsUrl)
+	uri, err := url.Parse(usersUrl)
 	if err != nil {
 		return nil, Page{}, err
 	}
