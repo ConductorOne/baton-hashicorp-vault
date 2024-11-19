@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
@@ -40,21 +41,28 @@ func main() {
 	}
 }
 
-func getConnector(ctx context.Context, v *viper.Viper) (types.ConnectorServer, error) {
+func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer, error) {
+	var (
+		fsClient = client.NewClient()
+		token    = cfg.GetString(VaultTokenField.GetName())
+		host     = cfg.GetString(VaultHostField.GetName())
+	)
 	l := ctxzap.Extract(ctx)
-	if err := ValidateConfig(v); err != nil {
+	cb, err := connector.New(ctx,
+		token,
+		host,
+		fsClient,
+	)
+	if err != nil {
+		l.Error("error creating connector", zap.Error(err))
 		return nil, err
 	}
 
-	cb, err := connector.New(ctx)
+	c, err := connectorbuilder.NewConnector(ctx, cb)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
 		return nil, err
 	}
-	connector, err := connectorbuilder.NewConnector(ctx, cb)
-	if err != nil {
-		l.Error("error creating connector", zap.Error(err))
-		return nil, err
-	}
-	return connector, nil
+
+	return c, nil
 }
