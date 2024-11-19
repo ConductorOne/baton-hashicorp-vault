@@ -14,7 +14,7 @@ var (
 	VaultHostField = field.StringField(
 		"x-vault-host",
 		field.WithRequired(true),
-		field.WithDescription("Vault Host"),
+		field.WithDescription("Vault Host. Ex. http://127.0.0.1:8200"),
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{}

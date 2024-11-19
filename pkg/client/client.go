@@ -11,6 +11,9 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
+// AuthHeaderName is the name of the header containing the token.
+const AuthHeaderName = "X-Vault-Token"
+
 type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
 	auth       *auth
@@ -65,7 +68,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	// bearerToken
-	fs := HCPClient{
+	hcp := HCPClient{
 		httpClient: cli,
 		baseUrl:    baseUrl,
 		auth: &auth{
@@ -73,7 +76,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 		},
 	}
 
-	return &fs, nil
+	return &hcp, nil
 }
 
 func (f *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*UsersAPIData, string, error) {
@@ -144,7 +147,7 @@ func (f *HCPClient) getAPIData(ctx context.Context,
 	}
 
 	setRawQuery(uri, sPage, limitPerPage)
-	if err, _, _ = f.doRequest(ctx, http.MethodGet, uri.String(), &res, nil); err != nil {
+	if _, _, err = f.doRequest(ctx, "LIST", uri.String(), &res, nil); err != nil {
 		return page, err
 	}
 
@@ -158,28 +161,28 @@ func (f *HCPClient) getAPIData(ctx context.Context,
 	return page, nil
 }
 
-func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (error, http.Header, any) {
+func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (http.Header, any, error) {
 	var (
 		resp *http.Response
 		err  error
 	)
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
-		return err, nil, nil
+		return nil, nil, err
 	}
 
 	req, err := f.httpClient.NewRequest(ctx,
 		method,
 		urlAddress,
-		uhttp.WithAcceptJSONHeader(),
+		uhttp.WithHeader(AuthHeaderName, f.getToken()),
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
-		return err, nil, nil
+		return nil, nil, err
 	}
 
 	switch method {
-	case http.MethodGet:
+	case "LIST":
 		resp, err = f.httpClient.Do(req, uhttp.WithResponse(&res))
 		defer resp.Body.Close()
 	case http.MethodPatch:
@@ -188,8 +191,8 @@ func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	}
 
 	if err != nil {
-		return err, nil, nil
+		return nil, nil, err
 	}
 
-	return nil, resp.Header, resp.StatusCode
+	return resp.Header, resp.StatusCode, nil
 }
