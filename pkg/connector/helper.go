@@ -4,16 +4,18 @@ import (
 	"context"
 	"strconv"
 
+	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
-func userResource(ctx context.Context, user string, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func userResource(ctx context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
 	var userStatus v2.UserTrait_Status_Status = v2.UserTrait_Status_STATUS_ENABLED
 	profile := map[string]interface{}{
-		"user_id":   user,
-		"user_name": user,
+		"user_id":    user.ID,
+		"user_name":  user.Name,
+		"mount_type": user.MountType,
 	}
 
 	userTraits := []rs.UserTraitOption{
@@ -22,9 +24,9 @@ func userResource(ctx context.Context, user string, parentResourceID *v2.Resourc
 	}
 
 	ret, err := rs.NewUserResource(
-		user,
+		user.Name,
 		userResourceType,
-		user,
+		user.ID,
 		userTraits,
 		rs.WithParentResourceID(parentResourceID))
 	if err != nil {
@@ -32,6 +34,25 @@ func userResource(ctx context.Context, user string, parentResourceID *v2.Resourc
 	}
 
 	return ret, nil
+}
+
+func roleResource(ctx context.Context, role *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	profile := map[string]interface{}{
+		"id":         role.ID,
+		"name":       role.Name,
+		"mount_type": role.MountType,
+	}
+
+	roleTraitOptions := []rs.RoleTraitOption{
+		rs.WithRoleProfile(profile),
+	}
+
+	resource, err := rs.NewRoleResource(role.Name, resourceTypeRole, role.ID, roleTraitOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
 }
 
 func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error) {

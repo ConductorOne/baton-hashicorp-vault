@@ -97,7 +97,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	return &hcp, nil
 }
 
-func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) ([]string, string, error) {
+func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*CommonAPIData, string, error) {
 	var nextPageToken string = ""
 	users, page, err := h.GetUsers(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
 	if err != nil {
@@ -108,12 +108,12 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) ([]strin
 		nextPageToken = *page.NextPage
 	}
 
-	return users.Data.Keys, nextPageToken, nil
+	return users, nextPageToken, nil
 }
 
 // GetUsers. List All Users.
-// https://developer.hashicorp.com/vault/api-docs/auth/userpass
-func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*UsersAPIData, Page, error) {
+// https://developer.hashicorp.com/vault/api-docs/auth/userpass#list-users
+func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
 	usersUrl, err := url.JoinPath(h.baseUrl, "userpass/users")
 	if err != nil {
 		return nil, Page{}, err
@@ -124,7 +124,48 @@ func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string
 		return nil, Page{}, err
 	}
 
-	var res *UsersAPIData
+	var res *CommonAPIData
+	page, err := h.getAPIData(ctx,
+		startPage,
+		limitPerPage,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, page, err
+	}
+
+	return res, page, nil
+}
+
+func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*CommonAPIData, string, error) {
+	var nextPageToken string = ""
+	roles, page, err := h.GetRoles(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	if err != nil {
+		return nil, "", err
+	}
+
+	if page.HasNext() {
+		nextPageToken = *page.NextPage
+	}
+
+	return roles, nextPageToken, nil
+}
+
+// GetUsers. List All Users.
+// https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
+func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
+	rolesUrl, err := url.JoinPath(h.baseUrl, "approle/role")
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	uri, err := url.Parse(rolesUrl)
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	var res *CommonAPIData
 	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,

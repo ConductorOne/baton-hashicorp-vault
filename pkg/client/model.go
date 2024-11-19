@@ -4,18 +4,24 @@ type auth struct {
 	bearerToken string
 }
 
-type UsersAPIData struct {
-	RequestID     string      `json:"request_id"`
-	LeaseID       string      `json:"lease_id"`
-	Renewable     bool        `json:"renewable"`
-	LeaseDuration int         `json:"lease_duration"`
-	Data          Data        `json:"data"`
-	WrapInfo      interface{} `json:"wrap_info"`
-	Warnings      interface{} `json:"warnings"`
-	Auth          interface{} `json:"auth"`
-	MountType     string      `json:"mount_type"`
+type CommonAPIData struct {
+	RequestID     string      `json:"request_id,omitempty"`
+	LeaseID       string      `json:"lease_id,omitempty"`
+	Renewable     bool        `json:"renewable,omitempty"`
+	LeaseDuration int         `json:"lease_duration,omitempty"`
+	Data          Data        `json:"data,omitempty"`
+	WrapInfo      interface{} `json:"wrap_info,omitempty"`
+	Warnings      interface{} `json:"warnings,omitempty"`
+	Auth          interface{} `json:"auth,omitempty"`
+	MountType     string      `json:"mount_type,omitempty"`
 }
 
 type Data struct {
-	Keys []string `json:"keys"`
+	Keys []string `json:"keys,omitempty"`
+}
+
+type APIResource struct {
+	ID        string `json:"id,omitempty"`
+	Name      string `json:"name,omitempty"`
+	MountType string `json:"mount_type,omitempty"`
 }
