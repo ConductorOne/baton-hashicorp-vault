@@ -12,7 +12,10 @@ import (
 )
 
 // AuthHeaderName is the name of the header containing the token.
-const AuthHeaderName = "X-Vault-Token"
+const (
+	AuthHeaderName = "X-Vault-Token"
+	DefaultAddress = "https://127.0.0.1:8200/v1/auth"
+)
 
 type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
@@ -30,13 +33,28 @@ func NewClient() *HCPClient {
 	}
 }
 
-func (f *HCPClient) WithBearerToken(apiToken string) *HCPClient {
-	f.auth.bearerToken = apiToken
-	return f
+func (h *HCPClient) WithBearerToken(apiToken string) *HCPClient {
+	h.auth.bearerToken = apiToken
+	return h
 }
 
-func (f *HCPClient) getToken() string {
-	return f.auth.bearerToken
+func (h *HCPClient) WithAddress(host string) (*HCPClient, error) {
+	endpointUrl, err := url.JoinPath(host, "v1/auth")
+	if err != nil {
+		return h, err
+	}
+
+	baseUrl, err := url.Parse(endpointUrl)
+	if err != nil {
+		return h, err
+	}
+
+	h.baseUrl = baseUrl.String()
+	return h, nil
+}
+
+func (h *HCPClient) getToken() string {
+	return h.auth.bearerToken
 }
 
 func isValidUrl(baseUrl string) bool {
@@ -47,7 +65,7 @@ func isValidUrl(baseUrl string) bool {
 func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	var (
 		clientToken = hcpClient.getToken()
-		baseUrl     = "http://127.0.0.1:8200/v1/auth"
+		baseUrl     = DefaultAddress
 	)
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
@@ -79,9 +97,9 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	return &hcp, nil
 }
 
-func (f *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*UsersAPIData, string, error) {
+func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) ([]string, string, error) {
 	var nextPageToken string = ""
-	users, page, err := f.GetUsers(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	users, page, err := h.GetUsers(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
 	if err != nil {
 		return nil, "", err
 	}
@@ -90,13 +108,13 @@ func (f *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*UsersA
 		nextPageToken = *page.NextPage
 	}
 
-	return users, nextPageToken, nil
+	return users.Data.Keys, nextPageToken, nil
 }
 
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass
-func (f *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*UsersAPIData, Page, error) {
-	agentsUrl, err := url.JoinPath(f.baseUrl, "userpass/users")
+func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*UsersAPIData, Page, error) {
+	agentsUrl, err := url.JoinPath(h.baseUrl, "userpass/users")
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -107,7 +125,7 @@ func (f *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string
 	}
 
 	var res *UsersAPIData
-	page, err := f.getAPIData(ctx,
+	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,
 		uri,
@@ -130,7 +148,7 @@ func setRawQuery(uri *url.URL, sPage string, limitPerPage string) {
 	uri.RawQuery = q.Encode()
 }
 
-func (f *HCPClient) getAPIData(ctx context.Context,
+func (h *HCPClient) getAPIData(ctx context.Context,
 	startPage string,
 	limitPerPage string,
 	uri *url.URL,
@@ -147,7 +165,7 @@ func (f *HCPClient) getAPIData(ctx context.Context,
 	}
 
 	setRawQuery(uri, sPage, limitPerPage)
-	if _, _, err = f.doRequest(ctx, "LIST", uri.String(), &res, nil); err != nil {
+	if _, _, err = h.doRequest(ctx, "LIST", uri.String(), &res, nil); err != nil {
 		return page, err
 	}
 
@@ -161,7 +179,7 @@ func (f *HCPClient) getAPIData(ctx context.Context,
 	return page, nil
 }
 
-func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (http.Header, any, error) {
+func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (http.Header, any, error) {
 	var (
 		resp *http.Response
 		err  error
@@ -171,10 +189,10 @@ func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		return nil, nil, err
 	}
 
-	req, err := f.httpClient.NewRequest(ctx,
+	req, err := h.httpClient.NewRequest(ctx,
 		method,
 		urlAddress,
-		uhttp.WithHeader(AuthHeaderName, f.getToken()),
+		uhttp.WithHeader(AuthHeaderName, h.getToken()),
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
@@ -183,10 +201,10 @@ func (f *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 
 	switch method {
 	case "LIST":
-		resp, err = f.httpClient.Do(req, uhttp.WithResponse(&res))
+		resp, err = h.httpClient.Do(req, uhttp.WithResponse(&res))
 		defer resp.Body.Close()
 	case http.MethodPatch:
-		resp, err = f.httpClient.Do(req)
+		resp, err = h.httpClient.Do(req)
 		defer resp.Body.Close()
 	}
 

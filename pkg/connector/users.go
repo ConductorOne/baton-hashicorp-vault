@@ -58,7 +58,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	for _, user := range users.Data.Keys {
+	for _, user := range users {
 		ur, err := userResource(ctx, user, nil)
 		if err != nil {
 			return nil, "", nil, err

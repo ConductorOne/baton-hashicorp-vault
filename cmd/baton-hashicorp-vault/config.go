@@ -7,14 +7,14 @@ import (
 
 var (
 	VaultTokenField = field.StringField(
-		"x-vault-token",
+		"vault-token",
 		field.WithRequired(true),
 		field.WithDescription("Vault Token"),
 	)
 	VaultHostField = field.StringField(
-		"x-vault-host",
+		"vault-host",
 		field.WithRequired(true),
-		field.WithDescription("Vault Host. Ex. http://127.0.0.1:8200"),
+		field.WithDescription("Vault address or Host. Ex. http://127.0.0.1:8200"),
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{}
