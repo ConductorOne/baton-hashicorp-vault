@@ -18,7 +18,7 @@ var (
 	roleResourceType = &v2.ResourceType{
 		Id:          "role",
 		DisplayName: "Role",
-		Description: "Roles of FreshService",
+		Description: "Roles of Hashicorp Vault",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_ROLE},
 	}
 
