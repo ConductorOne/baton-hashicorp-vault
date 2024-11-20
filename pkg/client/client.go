@@ -13,8 +13,11 @@ import (
 
 const (
 	// AuthHeaderName is the name of the header containing the token.
-	AuthHeaderName = "X-Vault-Token"
-	DefaultAddress = "http://127.0.0.1:8200"
+	AuthHeaderName   = "X-Vault-Token"
+	DefaultAddress   = "http://127.0.0.1:8200"
+	usersEndpoint    = "v1/auth/userpass/users"
+	rolesEndpoint    = "v1/auth/approle/role"
+	policiesEndpoint = "v1/sys/policy"
 )
 
 type HCPClient struct {
@@ -108,7 +111,7 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#list-users
 func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	usersUrl, err := url.JoinPath(h.baseUrl, "v1/auth/userpass/users")
+	usersUrl, err := url.JoinPath(h.baseUrl, usersEndpoint)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -150,7 +153,7 @@ func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
 func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	rolesUrl, err := url.JoinPath(h.baseUrl, "v1/auth/approle/role")
+	rolesUrl, err := url.JoinPath(h.baseUrl, rolesEndpoint)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -192,7 +195,7 @@ func (h *HCPClient) ListAllPolicies(ctx context.Context, opts PageOptions) (*Pol
 // GetPolicies. List All Policies.
 // https://developer.hashicorp.com/vault/api-docs/system/policy
 func (h *HCPClient) GetPolicies(ctx context.Context, startPage, limitPerPage string) (*PolicyAPIData, Page, error) {
-	policiesUrl, err := url.JoinPath(h.baseUrl, "v1/sys/policy")
+	policiesUrl, err := url.JoinPath(h.baseUrl, policiesEndpoint)
 	if err != nil {
 		return nil, Page{}, err
 	}

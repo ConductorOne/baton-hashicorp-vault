@@ -45,7 +45,7 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		}
 	}
 
-	users, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{
+	policies, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{
 		PerPage: ITEMSPERPAGE,
 		Page:    pageToken,
 	})
@@ -58,11 +58,11 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		return nil, "", nil, err
 	}
 
-	for _, policy := range users.Data.Policies {
+	for _, policy := range policies.Data.Policies {
 		ur, err := policyResource(ctx, &client.APIResource{
 			ID:        policy,
 			Name:      policy,
-			MountType: users.MountType,
+			MountType: policies.MountType,
 		}, nil)
 		if err != nil {
 			return nil, "", nil, err
@@ -82,8 +82,8 @@ func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _
 	var rv []*v2.Entitlement
 	assigmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(userResourceType),
-		ent.WithDescription(fmt.Sprintf("Assigned to %s role", resource.DisplayName)),
-		ent.WithDisplayName(fmt.Sprintf("%s role %s", resource.DisplayName, assignedEntitlement)),
+		ent.WithDescription(fmt.Sprintf("Assigned to %s policy", resource.DisplayName)),
+		ent.WithDisplayName(fmt.Sprintf("%s policy %s", resource.DisplayName, assignedEntitlement)),
 	}
 	rv = append(rv, ent.NewAssignmentEntitlement(resource, assignedEntitlement, assigmentOptions...))
 
