@@ -12,21 +12,16 @@ import (
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 )
 
-type roleBuilder struct {
+type policyBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.HCPClient
 }
 
-const (
-	assignedEntitlement = "assigned"
-	NF                  = -1
-)
-
-func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
-	return roleResourceType
+func (p *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
+	return policyResourceType
 }
 
-func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var (
 		pageToken int
 		err       error
@@ -39,7 +34,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	if bag.Current() == nil {
 		bag.Push(pagination.PageState{
-			ResourceTypeID: roleResourceType.Id,
+			ResourceTypeID: policyResourceType.Id,
 		})
 	}
 
@@ -50,7 +45,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		}
 	}
 
-	users, nextPageToken, err := r.client.ListAllRoles(ctx, client.PageOptions{
+	users, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{
 		PerPage: ITEMSPERPAGE,
 		Page:    pageToken,
 	})
@@ -63,10 +58,10 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	for _, user := range users.Data.Keys {
-		ur, err := roleResource(ctx, &client.APIResource{
-			ID:        user,
-			Name:      user,
+	for _, policy := range users.Data.Policies {
+		ur, err := policyResource(ctx, &client.APIResource{
+			ID:        policy,
+			Name:      policy,
 			MountType: users.MountType,
 		}, nil)
 		if err != nil {
@@ -83,7 +78,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	return rv, nextPageToken, nil, nil
 }
 
-func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
 	var rv []*v2.Entitlement
 	assigmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(userResourceType),
@@ -95,21 +90,21 @@ func (r *roleBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *
 	return rv, "", nil, nil
 }
 
-func (r *roleBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	return nil, "", nil, nil
 }
 
-func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
 	return nil, nil
 }
 
-func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
 	return nil, nil
 }
 
-func newRoleBuilder(c *client.HCPClient) *roleBuilder {
-	return &roleBuilder{
-		resourceType: roleResourceType,
+func newPolicyBuilder(c *client.HCPClient) *policyBuilder {
+	return &policyBuilder{
+		resourceType: policyResourceType,
 		client:       c,
 	}
 }

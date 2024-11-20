@@ -15,10 +15,17 @@ var (
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_USER},
 	}
 
-	resourceTypeRole = &v2.ResourceType{
+	roleResourceType = &v2.ResourceType{
 		Id:          "role",
 		DisplayName: "Role",
 		Description: "Roles of FreshService",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_ROLE},
+	}
+
+	policyResourceType = &v2.ResourceType{
+		Id:          "policy",
+		DisplayName: "Policy",
+		Description: "Policy of Hashicorp Vault",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
 )

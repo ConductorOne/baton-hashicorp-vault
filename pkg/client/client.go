@@ -11,10 +11,10 @@ import (
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
 
-// AuthHeaderName is the name of the header containing the token.
 const (
+	// AuthHeaderName is the name of the header containing the token.
 	AuthHeaderName = "X-Vault-Token"
-	DefaultAddress = "https://127.0.0.1:8200/v1/auth"
+	DefaultAddress = "http://127.0.0.1:8200"
 )
 
 type HCPClient struct {
@@ -39,17 +39,11 @@ func (h *HCPClient) WithBearerToken(apiToken string) *HCPClient {
 }
 
 func (h *HCPClient) WithAddress(host string) (*HCPClient, error) {
-	endpointUrl, err := url.JoinPath(host, "v1/auth")
-	if err != nil {
-		return h, err
+	if !isValidUrl(host) {
+		return h, fmt.Errorf("host is not valid")
 	}
 
-	baseUrl, err := url.Parse(endpointUrl)
-	if err != nil {
-		return h, err
-	}
-
-	h.baseUrl = baseUrl.String()
+	h.baseUrl = host
 	return h, nil
 }
 
@@ -114,7 +108,7 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#list-users
 func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	usersUrl, err := url.JoinPath(h.baseUrl, "userpass/users")
+	usersUrl, err := url.JoinPath(h.baseUrl, "v1/auth/userpass/users")
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -128,6 +122,7 @@ func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string
 	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,
+		"LIST",
 		uri,
 		&res,
 	)
@@ -155,7 +150,7 @@ func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
 func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	rolesUrl, err := url.JoinPath(h.baseUrl, "approle/role")
+	rolesUrl, err := url.JoinPath(h.baseUrl, "v1/auth/approle/role")
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -169,6 +164,49 @@ func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string
 	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,
+		"LIST",
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, page, err
+	}
+
+	return res, page, nil
+}
+
+func (h *HCPClient) ListAllPolicies(ctx context.Context, opts PageOptions) (*PolicyAPIData, string, error) {
+	var nextPageToken string = ""
+	policies, page, err := h.GetPolicies(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	if err != nil {
+		return nil, "", err
+	}
+
+	if page.HasNext() {
+		nextPageToken = *page.NextPage
+	}
+
+	return policies, nextPageToken, nil
+}
+
+// GetPolicies. List All Policies.
+// https://developer.hashicorp.com/vault/api-docs/system/policy
+func (h *HCPClient) GetPolicies(ctx context.Context, startPage, limitPerPage string) (*PolicyAPIData, Page, error) {
+	policiesUrl, err := url.JoinPath(h.baseUrl, "v1/sys/policy")
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	uri, err := url.Parse(policiesUrl)
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	var res *PolicyAPIData
+	page, err := h.getAPIData(ctx,
+		startPage,
+		limitPerPage,
+		http.MethodGet,
 		uri,
 		&res,
 	)
@@ -190,8 +228,7 @@ func setRawQuery(uri *url.URL, sPage string, limitPerPage string) {
 }
 
 func (h *HCPClient) getAPIData(ctx context.Context,
-	startPage string,
-	limitPerPage string,
+	startPage, limitPerPage, method string,
 	uri *url.URL,
 	res any,
 ) (Page, error) {
@@ -206,7 +243,7 @@ func (h *HCPClient) getAPIData(ctx context.Context,
 	}
 
 	setRawQuery(uri, sPage, limitPerPage)
-	if _, _, err = h.doRequest(ctx, "LIST", uri.String(), &res, nil); err != nil {
+	if _, _, err = h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
 		return page, err
 	}
 
@@ -241,9 +278,11 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	}
 
 	switch method {
-	case "LIST":
+	case "LIST", "GET":
 		resp, err = h.httpClient.Do(req, uhttp.WithResponse(&res))
-		defer resp.Body.Close()
+		if resp != nil {
+			defer resp.Body.Close()
+		}
 	case http.MethodPatch:
 		resp, err = h.httpClient.Do(req)
 		defer resp.Body.Close()

@@ -44,3 +44,25 @@ func TestUsersBuilderList(t *testing.T) {
 		token = tk
 	}
 }
+
+func TestPolicyBuilderList(t *testing.T) {
+	if vaultToken == "" && vaultHost == "" {
+		t.Skip()
+	}
+
+	cliTest, err := getClientForTesting(ctxTest)
+	require.Nil(t, err)
+
+	p := &policyBuilder{
+		resourceType: policyResourceType,
+		client:       cliTest,
+	}
+	var token = "{}"
+	for token != "" {
+		_, tk, _, err := p.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
+			Token: token,
+		})
+		require.Nil(t, err)
+		token = tk
+	}
+}

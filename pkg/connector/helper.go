@@ -47,7 +47,32 @@ func roleResource(ctx context.Context, role *client.APIResource, parentResourceI
 		rs.WithRoleProfile(profile),
 	}
 
-	resource, err := rs.NewRoleResource(role.Name, resourceTypeRole, role.ID, roleTraitOptions)
+	resource, err := rs.NewRoleResource(role.Name, roleResourceType, role.ID, roleTraitOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}
+
+func policyResource(ctx context.Context, policy *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	var opts []rs.ResourceOption
+	profile := map[string]interface{}{
+		"id":         policy.ID,
+		"name":       policy.Name,
+		"mount_type": policy.MountType,
+	}
+
+	policyTraitOptions := []rs.AppTraitOption{
+		rs.WithAppProfile(profile),
+	}
+	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	resource, err := rs.NewResource(
+		policy.Name,
+		policyResourceType,
+		policy.ID,
+		opts...,
+	)
 	if err != nil {
 		return nil, err
 	}
