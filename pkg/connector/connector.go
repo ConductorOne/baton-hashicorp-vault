@@ -51,6 +51,16 @@ func New(ctx context.Context, token, host string, hcpClient *client.HCPClient) (
 		if err != nil {
 			return nil, err
 		}
+
+		err = hcpClient.EnableAuthMethod(ctx, "approle", client.ApproleAuthEndpoint)
+		if err != nil {
+			return nil, err
+		}
+
+		err = hcpClient.EnableAuthMethod(ctx, "userpass", client.UserAuthEndpoint)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Connector{

@@ -2,10 +2,13 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -13,17 +16,24 @@ import (
 
 const (
 	// AuthHeaderName is the name of the header containing the token.
-	AuthHeaderName   = "X-Vault-Token"
-	DefaultAddress   = "http://127.0.0.1:8200"
-	usersEndpoint    = "v1/auth/userpass/users"
-	rolesEndpoint    = "v1/auth/approle/role"
-	policiesEndpoint = "v1/sys/policy"
+	AuthHeaderName      = "X-Vault-Token"
+	DefaultAddress      = "http://127.0.0.1:8200"
+	usersEndpoint       = "v1/auth/userpass/users"
+	rolesEndpoint       = "v1/auth/approle/role"
+	policiesEndpoint    = "v1/sys/policy"
+	ApproleAuthEndpoint = "v1/sys/auth/approle"
+	UserAuthEndpoint    = "v1/sys/auth/userpass"
+	MethodList          = "LIST"
 )
 
 type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
 	auth       *auth
 	baseUrl    string
+}
+
+type CustomErr struct {
+	Errors []string `json:"errors"`
 }
 
 func NewClient() *HCPClient {
@@ -125,7 +135,7 @@ func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string
 	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,
-		"LIST",
+		MethodList,
 		uri,
 		&res,
 	)
@@ -167,7 +177,7 @@ func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string
 	page, err := h.getAPIData(ctx,
 		startPage,
 		limitPerPage,
-		"LIST",
+		MethodList,
 		uri,
 		&res,
 	)
@@ -281,14 +291,32 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	}
 
 	switch method {
-	case "LIST", "GET":
+	case MethodList, http.MethodGet:
 		resp, err = h.httpClient.Do(req, uhttp.WithResponse(&res))
 		if resp != nil {
 			defer resp.Body.Close()
 		}
-	case http.MethodPatch:
+	case http.MethodPost:
 		resp, err = h.httpClient.Do(req)
-		defer resp.Body.Close()
+		if resp != nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusBadRequest {
+				bytes, err := io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, nil, err
+				}
+
+				var cErr CustomErr
+				err = json.Unmarshal(bytes, &cErr)
+				if err != nil {
+					return nil, nil, err
+				}
+				// It is already authorized
+				if strings.Contains(cErr.Errors[0], "path is already in use") {
+					return nil, nil, nil
+				}
+			}
+		}
 	}
 
 	if err != nil {
@@ -296,4 +324,38 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	}
 
 	return resp.Header, resp.StatusCode, nil
+}
+
+// EnableAuthMethod. The approle auth method allows machines or apps to authenticate with Vault-defined roles.
+// An "AppRole" represents a set of Vault policies and login constraints that must be met to receive a token with those policies.
+// https://developer.hashicorp.com/vault/docs/auth/approle
+func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl string) error {
+	var (
+		body struct {
+			Type string `json:"type"`
+		}
+	)
+
+	auth, err := json.Marshal(authMethod)
+	if err != nil {
+		return err
+	}
+
+	payload := []byte(fmt.Sprintf(`{ "type": %s }`, auth))
+	err = json.Unmarshal(payload, &body)
+	if err != nil {
+		return err
+	}
+
+	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl)
+	if err != nil {
+		return err
+	}
+
+	var res any
+	if _, _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+		return err
+	}
+
+	return nil
 }
