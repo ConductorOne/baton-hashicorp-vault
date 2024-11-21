@@ -18,8 +18,8 @@ const (
 	// AuthHeaderName is the name of the header containing the token.
 	AuthHeaderName      = "X-Vault-Token"
 	DefaultAddress      = "http://127.0.0.1:8200"
-	usersEndpoint       = "v1/auth/userpass/users"
-	rolesEndpoint       = "v1/auth/approle/role"
+	UsersEndpoint       = "v1/auth/userpass/users"
+	RolesEndpoint       = "v1/auth/approle/role"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
@@ -121,7 +121,7 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#list-users
 func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	usersUrl, err := url.JoinPath(h.baseUrl, usersEndpoint)
+	usersUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -163,7 +163,7 @@ func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*Common
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
 func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
-	rolesUrl, err := url.JoinPath(h.baseUrl, rolesEndpoint)
+	rolesUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint)
 	if err != nil {
 		return nil, Page{}, err
 	}
@@ -358,4 +358,76 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl str
 	}
 
 	return nil
+}
+
+func (h *HCPClient) AddUsers(ctx context.Context, authMethod, apiUrl, name string) (any, error) {
+	var (
+		body struct {
+			Password        string   `json:"password"`
+			TokenPolicies   []string `json:"token_policies"`
+			TokenBoundCidrs []string `json:"token_bound_cidrs"`
+		}
+		statusCode any
+	)
+
+	payload := []byte(`{ 
+		"password": "superSecretPassword", 
+		"token_policies": ["admin", "default"], 
+		"token_bound_cidrs": ["127.0.0.1/32", "128.252.0.0/16"] 
+	}`)
+	err := json.Unmarshal(payload, &body)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var res any
+	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+		return nil, err
+	}
+
+	return statusCode, nil
+}
+
+func (h *HCPClient) AddRoles(ctx context.Context, authMethod, apiUrl, name string) (any, error) {
+	var (
+		body struct {
+			TokenType     string   `json:"token_type"`
+			TokenTTL      string   `json:"token_ttl"`
+			TokenMaxTTL   string   `json:"token_max_ttl"`
+			TokenPolicies []string `json:"token_policies"`
+			Period        int      `json:"period"`
+			BindSecretID  bool     `json:"bind_secret_id"`
+		}
+		statusCode any
+	)
+
+	payload := []byte(`{
+		  "token_type": "batch",
+		  "token_ttl": "60m",
+		  "token_max_ttl": "180m",
+		  "token_policies": ["default"],
+		  "period": 0,
+		  "bind_secret_id": true
+		}`)
+	err := json.Unmarshal(payload, &body)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var res any
+	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+		return nil, err
+	}
+
+	return statusCode, nil
 }
