@@ -10,6 +10,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
+	"github.com/conductorone/baton-sdk/pkg/types/grant"
 )
 
 type policyBuilder struct {
@@ -91,7 +92,67 @@ func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _
 }
 
 func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
-	return nil, "", nil, nil
+	var (
+		pageToken int
+		err       error
+		rv        []*v2.Grant
+	)
+	_, bag, err := unmarshalSkipToken(pToken)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	if bag.Current() == nil {
+		bag.Push(pagination.PageState{
+			ResourceTypeID: userResourceType.Id,
+		})
+	}
+
+	if bag.Current().Token != "" {
+		pageToken, err = strconv.Atoi(bag.Current().Token)
+		if err != nil {
+			return nil, "", nil, err
+		}
+	}
+
+	users, nextPageToken, err := p.client.ListAllUsers(ctx, client.PageOptions{
+		PerPage: ITEMSPERPAGE,
+		Page:    pageToken,
+	})
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	err = bag.Next(nextPageToken)
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	for _, user := range users.Data.Keys {
+		userInfo, _, err := p.client.GetUser(ctx, user)
+		if err != nil {
+			return nil, "", nil, err
+		}
+
+		for _, userPolicy := range userInfo.Data.TokenPolicies {
+			if userPolicy != resource.Id.Resource {
+				continue
+			}
+		}
+
+		grant := grant.NewGrant(resource, assignedEntitlement, &v2.ResourceId{
+			ResourceType: userResourceType.Id,
+			Resource:     user,
+		})
+		rv = append(rv, grant)
+	}
+
+	nextPageToken, err = bag.Marshal()
+	if err != nil {
+		return nil, "", nil, err
+	}
+
+	return rv, nextPageToken, nil, nil
 }
 
 func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {

@@ -431,3 +431,30 @@ func (h *HCPClient) AddRoles(ctx context.Context, authMethod, apiUrl, name strin
 
 	return statusCode, nil
 }
+
+func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, Page, error) {
+	var startPage, limitPerPage = "1", "1"
+	userUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	uri, err := url.Parse(userUrl)
+	if err != nil {
+		return nil, Page{}, err
+	}
+
+	var res *UserAPIData
+	page, err := h.getAPIData(ctx,
+		startPage,
+		limitPerPage,
+		http.MethodGet,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, page, err
+	}
+
+	return res, page, nil
+}
