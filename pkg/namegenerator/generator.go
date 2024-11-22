@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"strings"
 )
 
 type Generator interface {
@@ -20,11 +21,8 @@ func (rn *NameGenerator) Generate() (string, error) {
 		return "", fmt.Errorf("%v", err.Error())
 	}
 
-	randomAdjective := NAMES[seed.Int64()]
-	randomNoun := LASTNAMES[seed.Int64()]
-	randomName := fmt.Sprintf("%v-%v", randomAdjective, randomNoun)
-
-	return randomName, nil
+	randomName := FULLNAMES[seed.Int64()]
+	return strings.ReplaceAll(randomName, " ", ""), nil
 }
 
 func NewNameGenerator(seed int64) Generator {

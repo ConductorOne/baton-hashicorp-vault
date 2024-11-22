@@ -113,20 +113,20 @@ func TestRoleBuilderList(t *testing.T) {
 }
 
 func TestAddUsers(t *testing.T) {
-	var count = 10
+	var count = 100
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
 	}
 
 	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
 	require.Nil(t, err)
+	cli, err := client.New(context.Background(), cliTest)
+	require.Nil(t, err)
 
 	for i := 0; i < count; i++ {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
 		name, err := nameGenerator.Generate()
-		require.Nil(t, err)
-		cli, err := client.New(context.Background(), cliTest)
 		require.Nil(t, err)
 		code, err := cli.AddUsers(context.Background(), http.MethodPost, client.UsersEndpoint, name)
 		require.Nil(t, err)
@@ -142,13 +142,12 @@ func TestAddRoles(t *testing.T) {
 
 	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
 	require.Nil(t, err)
-
+	cli, err := client.New(context.Background(), cliTest)
+	require.Nil(t, err)
 	for i := 0; i < count; i++ {
 		seed := time.Now().UTC().UnixNano()
 		nameGenerator := namegenerator.NewNameGenerator(seed)
 		name, err := nameGenerator.Generate()
-		require.Nil(t, err)
-		cli, err := client.New(context.Background(), cliTest)
 		require.Nil(t, err)
 		code, err := cli.AddRoles(context.Background(), http.MethodPost, client.RolesEndpoint, name)
 		require.Nil(t, err)
