@@ -3,6 +3,8 @@ package connector
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -11,6 +13,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type policyBuilder struct {
@@ -156,10 +160,101 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 }
 
 func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+	if principal.Id.ResourceType != userResourceType.Id {
+		l.Warn(
+			"hcp-connector: only users can be granted policy membership",
+			zap.String("principal_type", principal.Id.ResourceType),
+			zap.String("principal_id", principal.Id.Resource),
+		)
+		return nil, fmt.Errorf("hcp-connector: only users can be granted policy membership")
+	}
+
+	policyId := entitlement.Resource.Id.Resource
+	userId := principal.Id.Resource
+	userInfo, _, err := p.client.GetUser(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies = []string{}
+	policies = append(policies, userInfo.Data.TokenPolicies...)
+	posPolicy := slices.IndexFunc(policies, func(c string) bool {
+		return c == policyId
+	})
+	if posPolicy != NF {
+		l.Warn(
+			"hcp-connector: user already has this policy",
+			zap.String("principal_id", principal.Id.String()),
+			zap.String("principal_type", principal.Id.ResourceType),
+		)
+		return nil, fmt.Errorf("hcp-connector: user %s already has this policy %s", userId, policyId)
+	}
+
+	policies = append(policies, policyId)
+	statusCode, err := p.client.UpdateUserPolicy(ctx, policies, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	if http.StatusNoContent == statusCode {
+		l.Warn("Policy Membership has been created.",
+			zap.String("userId", userId),
+			zap.String("policyId", policyId),
+		)
+	}
+
 	return nil, nil
 }
 
 func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
+	l := ctxzap.Extract(ctx)
+	principal := grant.Principal
+	entitlement := grant.Entitlement
+	if principal.Id.ResourceType != userResourceType.Id {
+		l.Warn(
+			"hcp-connector: only users can have policy membership revoked",
+			zap.String("principal_id", principal.Id.String()),
+			zap.String("principal_type", principal.Id.ResourceType),
+		)
+
+		return nil, fmt.Errorf("hcp-connector: only users can have policy membership revoked")
+	}
+
+	userId := principal.Id.Resource
+	policyId := entitlement.Resource.Id.Resource
+	userInfo, _, err := p.client.GetUser(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	var policies = []string{}
+	policies = append(policies, userInfo.Data.TokenPolicies...)
+	posPolicy := slices.IndexFunc(policies, func(c string) bool {
+		return c == policyId
+	})
+	if posPolicy == NF {
+		l.Warn(
+			"hcp-connector: user does not have this policy",
+			zap.String("principal_id", principal.Id.String()),
+			zap.String("principal_type", principal.Id.ResourceType),
+		)
+		return nil, fmt.Errorf("hcp-connector: user %s does not have this policy %s", userId, policyId)
+	}
+
+	policies = RemoveIndex(policies, posPolicy)
+	statusCode, err := p.client.UpdateUserPolicy(ctx, policies, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	if http.StatusNoContent == statusCode {
+		l.Warn("Policy Membership has been revoked.",
+			zap.String("userId", userId),
+			zap.String("policyId", policyId),
+		)
+	}
+
 	return nil, nil
 }
 

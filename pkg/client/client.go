@@ -360,7 +360,7 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl str
 	return nil
 }
 
-func (h *HCPClient) AddUsers(ctx context.Context, authMethod, apiUrl, name string) (any, error) {
+func (h *HCPClient) AddUsers(ctx context.Context, name string) (any, error) {
 	var (
 		body struct {
 			Password        string   `json:"password"`
@@ -380,7 +380,7 @@ func (h *HCPClient) AddUsers(ctx context.Context, authMethod, apiUrl, name strin
 		return nil, err
 	}
 
-	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl, name)
+	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
 		return nil, err
 	}
@@ -393,7 +393,7 @@ func (h *HCPClient) AddUsers(ctx context.Context, authMethod, apiUrl, name strin
 	return statusCode, nil
 }
 
-func (h *HCPClient) AddRoles(ctx context.Context, authMethod, apiUrl, name string) (any, error) {
+func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
 	var (
 		body struct {
 			TokenType     string   `json:"token_type"`
@@ -419,7 +419,7 @@ func (h *HCPClient) AddRoles(ctx context.Context, authMethod, apiUrl, name strin
 		return nil, err
 	}
 
-	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl, name)
+	endpointUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint, name)
 	if err != nil {
 		return nil, err
 	}
@@ -457,4 +457,36 @@ func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, Pag
 	}
 
 	return res, page, nil
+}
+
+func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) (any, error) {
+	var (
+		body struct {
+			TokenPolicies []string `json:"token_policies"`
+		}
+		statusCode any
+	)
+
+	policies, err := json.Marshal(policy)
+	if err != nil {
+		return nil, err
+	}
+
+	payload := []byte(fmt.Sprintf(`{ "token_policies": %s }`, policies))
+	err = json.Unmarshal(payload, &body)
+	if err != nil {
+		return nil, err
+	}
+
+	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name, "policies")
+	if err != nil {
+		return nil, err
+	}
+
+	var res any
+	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+		return nil, err
+	}
+
+	return statusCode, nil
 }
