@@ -211,16 +211,6 @@ func (h *HCPClient) GetPolicies(ctx context.Context) (*PolicyAPIData, error) {
 	return res, nil
 }
 
-// setRawQuery. Set query parameters.
-// page : number for the page (inclusive). If not passed, first page is assumed.
-// per_page : Number of items to return.
-func setRawQuery(uri *url.URL, sPage string, limitPerPage string) {
-	q := uri.Query()
-	q.Set("per_page", limitPerPage)
-	q.Set("page", sPage)
-	uri.RawQuery = q.Encode()
-}
-
 func (h *HCPClient) getAPIData(ctx context.Context,
 	method string,
 	uri *url.URL,
