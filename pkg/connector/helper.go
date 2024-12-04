@@ -101,3 +101,26 @@ func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error)
 func RemoveIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
+
+func handleToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*pagination.Bag, int, error) {
+	var pageToken int
+	_, bag, err := unmarshalSkipToken(pToken)
+	if err != nil {
+		return bag, 0, err
+	}
+
+	if bag.Current() == nil {
+		bag.Push(pagination.PageState{
+			ResourceTypeID: resourceType.Id,
+		})
+	}
+
+	if bag.Current().Token != "" {
+		pageToken, err = strconv.Atoi(bag.Current().Token)
+		if err != nil {
+			return bag, 0, err
+		}
+	}
+
+	return bag, pageToken, nil
+}

@@ -30,15 +30,9 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		err error
 		rv  []*v2.Resource
 	)
-	_, bag, err := unmarshalSkipToken(pToken)
+	bag, _, err := handleToken(pToken, userResourceType)
 	if err != nil {
 		return nil, "", nil, err
-	}
-
-	if bag.Current() == nil {
-		bag.Push(pagination.PageState{
-			ResourceTypeID: roleResourceType.Id,
-		})
 	}
 
 	roles, nextPageToken, err := r.client.ListAllRoles(ctx, client.PageOptions{})

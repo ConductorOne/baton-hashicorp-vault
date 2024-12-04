@@ -88,15 +88,9 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 		err error
 		rv  []*v2.Grant
 	)
-	_, bag, err := unmarshalSkipToken(pToken)
+	bag, _, err := handleToken(pToken, userResourceType)
 	if err != nil {
 		return nil, "", nil, err
-	}
-
-	if bag.Current() == nil {
-		bag.Push(pagination.PageState{
-			ResourceTypeID: userResourceType.Id,
-		})
 	}
 
 	users, nextPageToken, err := p.client.ListAllUsers(ctx)
