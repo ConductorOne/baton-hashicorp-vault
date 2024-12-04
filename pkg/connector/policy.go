@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -28,9 +27,8 @@ func (p *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 
 func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var (
-		pageToken int
-		err       error
-		rv        []*v2.Resource
+		err error
+		rv  []*v2.Resource
 	)
 	_, bag, err := unmarshalSkipToken(pToken)
 	if err != nil {
@@ -43,17 +41,7 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		})
 	}
 
-	if bag.Current().Token != "" {
-		pageToken, err = strconv.Atoi(bag.Current().Token)
-		if err != nil {
-			return nil, "", nil, err
-		}
-	}
-
-	policies, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{
-		PerPage: ITEMSPERPAGE,
-		Page:    pageToken,
-	})
+	policies, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{})
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -97,9 +85,8 @@ func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _
 
 func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
 	var (
-		pageToken int
-		err       error
-		rv        []*v2.Grant
+		err error
+		rv  []*v2.Grant
 	)
 	_, bag, err := unmarshalSkipToken(pToken)
 	if err != nil {
@@ -112,17 +99,7 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 		})
 	}
 
-	if bag.Current().Token != "" {
-		pageToken, err = strconv.Atoi(bag.Current().Token)
-		if err != nil {
-			return nil, "", nil, err
-		}
-	}
-
-	users, nextPageToken, err := p.client.ListAllUsers(ctx, client.PageOptions{
-		PerPage: ITEMSPERPAGE,
-		Page:    pageToken,
-	})
+	users, nextPageToken, err := p.client.ListAllUsers(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -133,7 +110,7 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 	}
 
 	for _, user := range users.Data.Keys {
-		userInfo, _, err := p.client.GetUser(ctx, user)
+		userInfo, err := p.client.GetUser(ctx, user)
 		if err != nil {
 			return nil, "", nil, err
 		}
@@ -172,7 +149,7 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 
 	policyId := entitlement.Resource.Id.Resource
 	userId := principal.Id.Resource
-	userInfo, _, err := p.client.GetUser(ctx, userId)
+	userInfo, err := p.client.GetUser(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +200,7 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 
 	userId := principal.Id.Resource
 	policyId := entitlement.Resource.Id.Resource
-	userInfo, _, err := p.client.GetUser(ctx, userId)
+	userInfo, err := p.client.GetUser(ctx, userId)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"strconv"
 	"strings"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
@@ -104,15 +103,11 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	return &hcp, nil
 }
 
-func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*CommonAPIData, string, error) {
+func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {
 	var nextPageToken string = ""
-	users, page, err := h.GetUsers(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	users, err := h.GetUsers(ctx)
 	if err != nil {
 		return nil, "", err
-	}
-
-	if page.HasNext() {
-		nextPageToken = *page.NextPage
 	}
 
 	return users, nextPageToken, nil
@@ -120,41 +115,35 @@ func (h *HCPClient) ListAllUsers(ctx context.Context, opts PageOptions) (*Common
 
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#list-users
-func (h *HCPClient) GetUsers(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
+func (h *HCPClient) GetUsers(ctx context.Context) (*CommonAPIData, error) {
 	usersUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	uri, err := url.Parse(usersUrl)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	var res *CommonAPIData
-	page, err := h.getAPIData(ctx,
-		startPage,
-		limitPerPage,
+	err = h.getAPIData(ctx,
 		MethodList,
 		uri,
 		&res,
 	)
 	if err != nil {
-		return nil, page, err
+		return nil, err
 	}
 
-	return res, page, nil
+	return res, nil
 }
 
 func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*CommonAPIData, string, error) {
 	var nextPageToken string = ""
-	roles, page, err := h.GetRoles(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	roles, err := h.GetRoles(ctx)
 	if err != nil {
 		return nil, "", err
-	}
-
-	if page.HasNext() {
-		nextPageToken = *page.NextPage
 	}
 
 	return roles, nextPageToken, nil
@@ -162,41 +151,35 @@ func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*Common
 
 // GetUsers. List All Users.
 // https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
-func (h *HCPClient) GetRoles(ctx context.Context, startPage, limitPerPage string) (*CommonAPIData, Page, error) {
+func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 	rolesUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	uri, err := url.Parse(rolesUrl)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	var res *CommonAPIData
-	page, err := h.getAPIData(ctx,
-		startPage,
-		limitPerPage,
+	err = h.getAPIData(ctx,
 		MethodList,
 		uri,
 		&res,
 	)
 	if err != nil {
-		return nil, page, err
+		return nil, err
 	}
 
-	return res, page, nil
+	return res, nil
 }
 
 func (h *HCPClient) ListAllPolicies(ctx context.Context, opts PageOptions) (*PolicyAPIData, string, error) {
 	var nextPageToken string = ""
-	policies, page, err := h.GetPolicies(ctx, strconv.Itoa(opts.Page), strconv.Itoa(opts.PerPage))
+	policies, err := h.GetPolicies(ctx)
 	if err != nil {
 		return nil, "", err
-	}
-
-	if page.HasNext() {
-		nextPageToken = *page.NextPage
 	}
 
 	return policies, nextPageToken, nil
@@ -204,35 +187,33 @@ func (h *HCPClient) ListAllPolicies(ctx context.Context, opts PageOptions) (*Pol
 
 // GetPolicies. List All Policies.
 // https://developer.hashicorp.com/vault/api-docs/system/policy
-func (h *HCPClient) GetPolicies(ctx context.Context, startPage, limitPerPage string) (*PolicyAPIData, Page, error) {
+func (h *HCPClient) GetPolicies(ctx context.Context) (*PolicyAPIData, error) {
 	policiesUrl, err := url.JoinPath(h.baseUrl, policiesEndpoint)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	uri, err := url.Parse(policiesUrl)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	var res *PolicyAPIData
-	page, err := h.getAPIData(ctx,
-		startPage,
-		limitPerPage,
+	err = h.getAPIData(ctx,
 		http.MethodGet,
 		uri,
 		&res,
 	)
 	if err != nil {
-		return nil, page, err
+		return nil, err
 	}
 
-	return res, page, nil
+	return res, nil
 }
 
 // setRawQuery. Set query parameters.
 // page : number for the page (inclusive). If not passed, first page is assumed.
-// per_page : Number of items to return. If not passed, a page size of 30 is used.
+// per_page : Number of items to return.
 func setRawQuery(uri *url.URL, sPage string, limitPerPage string) {
 	q := uri.Query()
 	q.Set("per_page", limitPerPage)
@@ -241,33 +222,15 @@ func setRawQuery(uri *url.URL, sPage string, limitPerPage string) {
 }
 
 func (h *HCPClient) getAPIData(ctx context.Context,
-	startPage, limitPerPage, method string,
+	method string,
 	uri *url.URL,
 	res any,
-) (Page, error) {
-	var (
-		err          error
-		page         Page
-		IsLastPage   = true
-		sPage, nPage = "1", "0"
-	)
-	if startPage != "0" {
-		sPage = startPage
+) error {
+	if _, _, err := h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
+		return err
 	}
 
-	setRawQuery(uri, sPage, limitPerPage)
-	if _, _, err = h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
-		return page, err
-	}
-
-	if !IsLastPage {
-		page = Page{
-			PreviousPage: &sPage,
-			NextPage:     &nPage,
-		}
-	}
-
-	return page, nil
+	return nil
 }
 
 func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (http.Header, any, error) {
@@ -432,31 +395,28 @@ func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
 	return statusCode, nil
 }
 
-func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, Page, error) {
-	var startPage, limitPerPage = "1", "1"
+func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, error) {
 	userUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	uri, err := url.Parse(userUrl)
 	if err != nil {
-		return nil, Page{}, err
+		return nil, err
 	}
 
 	var res *UserAPIData
-	page, err := h.getAPIData(ctx,
-		startPage,
-		limitPerPage,
+	err = h.getAPIData(ctx,
 		http.MethodGet,
 		uri,
 		&res,
 	)
 	if err != nil {
-		return nil, page, err
+		return nil, err
 	}
 
-	return res, page, nil
+	return res, nil
 }
 
 func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) (any, error) {

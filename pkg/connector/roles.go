@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"strconv"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -28,9 +27,8 @@ func (r *roleBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 
 func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var (
-		pageToken int
-		err       error
-		rv        []*v2.Resource
+		err error
+		rv  []*v2.Resource
 	)
 	_, bag, err := unmarshalSkipToken(pToken)
 	if err != nil {
@@ -43,17 +41,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		})
 	}
 
-	if bag.Current().Token != "" {
-		pageToken, err = strconv.Atoi(bag.Current().Token)
-		if err != nil {
-			return nil, "", nil, err
-		}
-	}
-
-	users, nextPageToken, err := r.client.ListAllRoles(ctx, client.PageOptions{
-		PerPage: ITEMSPERPAGE,
-		Page:    pageToken,
-	})
+	roles, nextPageToken, err := r.client.ListAllRoles(ctx, client.PageOptions{})
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -63,11 +51,11 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	for _, user := range users.Data.Keys {
+	for _, user := range roles.Data.Keys {
 		ur, err := roleResource(ctx, &client.APIResource{
 			ID:        user,
 			Name:      user,
-			MountType: users.MountType,
+			MountType: roles.MountType,
 		}, nil)
 		if err != nil {
 			return nil, "", nil, err

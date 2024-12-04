@@ -2,7 +2,6 @@ package connector
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -23,9 +22,8 @@ func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 // Users include a UserTrait because they are the 'shape' of a standard user.
 func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var (
-		pageToken int
-		err       error
-		rv        []*v2.Resource
+		err error
+		rv  []*v2.Resource
 	)
 	_, bag, err := unmarshalSkipToken(pToken)
 	if err != nil {
@@ -38,17 +36,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		})
 	}
 
-	if bag.Current().Token != "" {
-		pageToken, err = strconv.Atoi(bag.Current().Token)
-		if err != nil {
-			return nil, "", nil, err
-		}
-	}
-
-	users, nextPageToken, err := u.client.ListAllUsers(ctx, client.PageOptions{
-		PerPage: ITEMSPERPAGE,
-		Page:    pageToken,
-	})
+	users, nextPageToken, err := u.client.ListAllUsers(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}
