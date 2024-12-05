@@ -84,10 +84,31 @@ type bodyRoles struct {
 	BindSecretID  bool     `json:"bind_secret_id"`
 }
 
-type bodyEnableAuth struct {
+type BodyEnableAuth struct {
 	Type string `json:"type"`
 }
 
 type bodyUpdateUserPolicy struct {
 	TokenPolicies []string `json:"token_policies"`
+}
+
+type BodySecret struct {
+	Type                  string  `json:"type"`
+	Description           string  `json:"description"`
+	Config                Config  `json:"config"`
+	Local                 bool    `json:"local"`
+	SealWrap              bool    `json:"seal_wrap"`
+	ExternalEntropyAccess bool    `json:"external_entropy_access"`
+	Options               Options `json:"options"`
+}
+
+type Config struct {
+	Options         interface{} `json:"options"`
+	DefaultLeaseTTL string      `json:"default_lease_ttl"`
+	MaxLeaseTTL     string      `json:"max_lease_ttl"`
+	ForceNoCache    bool        `json:"force_no_cache"`
+}
+
+type Options struct {
+	Version string `json:"version"`
 }

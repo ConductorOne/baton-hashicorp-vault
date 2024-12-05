@@ -39,14 +39,9 @@ func getClientForTesting(ctx context.Context, host string) (*client.HCPClient, e
 		return nil, err
 	}
 
-	err = hcpClient.EnableAuthMethod(ctx, "approle", client.ApproleAuthEndpoint)
+	err = enableStores(ctx, hcpClient)
 	if err != nil {
-		return hcpClient, err
-	}
-
-	err = hcpClient.EnableAuthMethod(ctx, "userpass", client.UserAuthEndpoint)
-	if err != nil {
-		return hcpClient, err
+		return nil, err
 	}
 
 	return hcpClient, nil

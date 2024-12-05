@@ -19,10 +19,11 @@ const (
 	DefaultAddress      = "http://127.0.0.1:8200"
 	UsersEndpoint       = "v1/auth/userpass/users"
 	RolesEndpoint       = "v1/auth/approle/role"
-	SecretsEndpoint     = "v1/kv"
+	KvEndpoint          = "v1/kv"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
+	KvAuthEndpoint      = "v1/sys/mounts/kv"
 	MethodList          = "LIST"
 )
 
@@ -127,7 +128,7 @@ func (h *HCPClient) ListAllSecrets(ctx context.Context) (*CommonAPIData, string,
 // GetSecrets. List All Secrets.
 // https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v1#ttls
 func (h *HCPClient) GetSecrets(ctx context.Context) (*CommonAPIData, error) {
-	secretsUrl, err := url.JoinPath(h.baseUrl, SecretsEndpoint)
+	secretsUrl, err := url.JoinPath(h.baseUrl, KvEndpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -319,16 +320,14 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 // EnableAuthMethod. The approle auth method allows machines or apps to authenticate with Vault-defined roles.
 // An "AppRole" represents a set of Vault policies and login constraints that must be met to receive a token with those policies.
 // https://developer.hashicorp.com/vault/docs/auth/approle
-func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl string) error {
+func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body any) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl)
 	if err != nil {
 		return err
 	}
 
 	var res any
-	if _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyEnableAuth{
-		Type: authMethod,
-	}); err != nil {
+	if _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
 		return err
 	}
 
