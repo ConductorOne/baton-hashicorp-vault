@@ -112,3 +112,7 @@ type Config struct {
 type Options struct {
 	Version string `json:"version"`
 }
+
+type bodySecrets struct {
+	MyValue string `json:"my-value"`
+}

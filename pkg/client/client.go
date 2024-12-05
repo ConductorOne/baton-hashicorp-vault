@@ -441,6 +441,23 @@ func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
 	return statusCode, nil
 }
 
+func (h *HCPClient) AddSecrets(ctx context.Context, name, value string) (any, error) {
+	var statusCode any
+	endpointUrl, err := url.JoinPath(h.baseUrl, KvEndpoint, name)
+	if err != nil {
+		return nil, err
+	}
+
+	var res any
+	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodySecrets{
+		MyValue: value,
+	}); err != nil {
+		return nil, err
+	}
+
+	return statusCode, nil
+}
+
 func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, error) {
 	userUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
