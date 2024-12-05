@@ -41,7 +41,7 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		})
 	}
 
-	policies, nextPageToken, err := p.client.ListAllPolicies(ctx, client.PageOptions{})
+	policies, nextPageToken, err := p.client.ListAllPolicies(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}

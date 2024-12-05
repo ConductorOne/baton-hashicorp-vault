@@ -35,7 +35,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		return nil, "", nil, err
 	}
 
-	roles, nextPageToken, err := r.client.ListAllRoles(ctx, client.PageOptions{})
+	roles, nextPageToken, err := r.client.ListAllRoles(ctx)
 	if err != nil {
 		return nil, "", nil, err
 	}

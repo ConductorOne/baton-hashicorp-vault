@@ -24,6 +24,9 @@ const (
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
 	KvAuthEndpoint      = "v1/sys/mounts/kv"
 	MethodList          = "LIST"
+	approleType         = "approle"
+	userpassType        = "userpass"
+	kvType              = "kv"
 )
 
 type HCPClient struct {
@@ -111,21 +114,21 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 
 func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 	err := hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
-		Type: "approle",
+		Type: approleType,
 	})
 	if err != nil {
 		return err
 	}
 
 	err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
-		Type: "userpass",
+		Type: userpassType,
 	})
 	if err != nil {
 		return err
 	}
 
 	err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
-		Type:        "kv",
+		Type:        kvType,
 		Description: "",
 		Config: Config{
 			Options:         nil,
@@ -219,7 +222,7 @@ func (h *HCPClient) GetUsers(ctx context.Context) (*CommonAPIData, error) {
 	return res, nil
 }
 
-func (h *HCPClient) ListAllRoles(ctx context.Context, opts PageOptions) (*CommonAPIData, string, error) {
+func (h *HCPClient) ListAllRoles(ctx context.Context) (*CommonAPIData, string, error) {
 	var nextPageToken string = ""
 	roles, err := h.GetRoles(ctx)
 	if err != nil {
@@ -255,7 +258,7 @@ func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 	return res, nil
 }
 
-func (h *HCPClient) ListAllPolicies(ctx context.Context, opts PageOptions) (*PolicyAPIData, string, error) {
+func (h *HCPClient) ListAllPolicies(ctx context.Context) (*PolicyAPIData, string, error) {
 	var nextPageToken string = ""
 	policies, err := h.GetPolicies(ctx)
 	if err != nil {
@@ -380,9 +383,9 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	return resp.StatusCode, nil
 }
 
-// EnableAuthMethod. The approle auth method allows machines or apps to authenticate with Vault-defined roles.
-// An "AppRole" represents a set of Vault policies and login constraints that must be met to receive a token with those policies.
-// https://developer.hashicorp.com/vault/docs/auth/approle
+// EnableAuthMethod. Enables you to use an auth method.
+// https://developer.hashicorp.com/vault/docs/auth
+// https://developer.hashicorp.com/vault/docs/auth/approle#via-the-api-1
 func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body any) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl)
 	if err != nil {
@@ -462,6 +465,8 @@ func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, err
 	return res, nil
 }
 
+// UpdateUserPolicy. Update policies for an existing user.
+// https://developer.hashicorp.com/vault/api-docs/auth/userpass#update-policies-on-user
 func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) (any, error) {
 	var statusCode any
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name, "policies")
