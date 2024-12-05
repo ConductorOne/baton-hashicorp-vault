@@ -41,10 +41,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BATON_LOG_LEVEL: debug
-      CONNECTOR_GRANT: 'grant:entitlement:group:1234:member:user:9876'
-      CONNECTOR_ENTITLEMENT: 'entitlement:group:1234:member'
-      CONNECTOR_PRINCIPAL: 'user:9876'
-      CONNECTOR_PRINCIPAL_TYPE: 'user'
     steps:
       - name: Install Go
         uses: actions/setup-go@v5
@@ -54,20 +50,29 @@ jobs:
         uses: actions/checkout@v4
       - name: Build baton-hashicorp-vault
         run: go build ./cmd/baton-hashicorp-vault
-      # - name: Run baton-hashicorp-vault
-      #   run: ./baton-hashicorp-vault
-      # - name: Install baton
-      #   run: ./scripts/get-baton.sh && mv baton /usr/local/bin
-      # - name: Check for grant before revoking
-      #   run:
-      #     baton grants --entitlement="${{ env.CONNECTOR_ENTITLEMENT }}" --output-format=json | jq --exit-status ".grants[].principal.id.resource == \"${{ env.CONNECTOR_PRINCIPAL }}\""
-      # - name: Revoke grants
-      #   run: ./baton-hashicorp-vault --revoke-grant="${{ env.CONNECTOR_GRANT }}"
-      # - name: Check grant was revoked
-      #   run: ./baton-hashicorp-vault && baton grants --entitlement="${{ env.CONNECTOR_ENTITLEMENT }}" --output-format=json | jq --exit-status "if .grants then .grants[]?.principal.id.resource != \"${{ env.CONNECTOR_PRINCIPAL }}\" else . end"
-      # - name: Grant entitlement
-      #   run: ./baton-hashicorp-vault --grant-entitlement="${{ env.CONNECTOR_ENTITLEMENT }}" --grant-principal="${{ env.CONNECTOR_PRINCIPAL }}" --grant-principal-type="${{ env.CONNECTOR_PRINCIPAL_TYPE }}"
-      # - name: Check grant was re-granted
-      #   run:
-      #     baton grants --entitlement="${{ env.CONNECTOR_ENTITLEMENT }}" --output-format=json | jq --exit-status ".grants[].principal.id.resource == \"${{ env.CONNECTOR_PRINCIPAL }}\""
-
+      - name: Run baton-hashicorp-vault
+        env:
+          BATON_VAULT_HOST: ${{ secrets.BATON_VAULT_HOST }}
+          BATON_VAULT_TOKEN: ${{ secrets.BATON_VAULT_TOKEN }}
+          BATON_DISABLE_HTTP_CACHE: true
+        run: ./baton-hashicorp-vault
+      - name: Checkout baton
+        uses: actions/checkout@v4
+        with:
+          repository: ConductorOne/baton
+          ref: main
+          path: ./baton
+      - name: Build baton
+        working-directory: ./baton
+        run: go build ./cmd/baton
+      # - name: Test grant/revoking policy
+      #   env:
+      #     BATON: ./baton/baton
+      #     BATON_HCP: ./baton-hashicorp-vault
+      #     BATON_VAULT_TOKEN: ${{ secrets.BATON_API_KEY }}
+      #     BATON_VAULT_HOST: 'conductoronehelpdesk'
+      #     BATON_GRANT: 'policy:root:member:user:adleyberry'
+      #     BATON_ENTITLEMENT: 'policy:root:assigned'
+      #     BATON_PRINCIPAL_TYPE: 'user'
+      #     BATON_PRINCIPAL: 'adleyberry'
+      #   run: ./test/grant-revoke.sh
