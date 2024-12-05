@@ -303,6 +303,21 @@ func (h *HCPClient) getAPIData(ctx context.Context,
 	return nil
 }
 
+func getError(resp *http.Response) (CustomErr, error) {
+	bytes, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return CustomErr{}, err
+	}
+
+	var cErr CustomErr
+	err = json.Unmarshal(bytes, &cErr)
+	if err != nil {
+		return cErr, err
+	}
+
+	return cErr, nil
+}
+
 func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (any, error) {
 	var (
 		resp *http.Response
@@ -328,23 +343,29 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		resp, err = h.httpClient.Do(req, uhttp.WithResponse(&res))
 		if resp != nil {
 			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusNotFound {
+				cErr, err := getError(resp)
+				if err != nil {
+					return nil, err
+				}
+
+				// There is no data
+				if len(cErr.Errors) == 0 {
+					return nil, nil
+				}
+			}
 		}
 	case http.MethodPost:
 		resp, err = h.httpClient.Do(req)
 		if resp != nil {
 			defer resp.Body.Close()
 			if resp.StatusCode == http.StatusBadRequest {
-				bytes, err := io.ReadAll(resp.Body)
+				cErr, err := getError(resp)
 				if err != nil {
 					return nil, err
 				}
 
-				var cErr CustomErr
-				err = json.Unmarshal(bytes, &cErr)
-				if err != nil {
-					return nil, err
-				}
-				// It is already authorized
+				// It's already authorized
 				if strings.Contains(cErr.Errors[0], "path is already in use") {
 					return nil, nil
 				}
