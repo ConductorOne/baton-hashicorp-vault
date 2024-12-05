@@ -1,4 +1,4 @@
-z# Start vault server locally for the purposes of integration tests.
+# Start vault server locally for the purposes of integration tests.
 version: "3.0"
 services:
   vault:
