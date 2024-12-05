@@ -80,6 +80,31 @@ func policyResource(ctx context.Context, policy *client.APIResource, parentResou
 	return resource, nil
 }
 
+func secretResource(ctx context.Context, secret *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	var opts []rs.ResourceOption
+	profile := map[string]interface{}{
+		"id":         secret.ID,
+		"name":       secret.Name,
+		"mount_type": secret.MountType,
+	}
+
+	policyTraitOptions := []rs.AppTraitOption{
+		rs.WithAppProfile(profile),
+	}
+	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	resource, err := rs.NewResource(
+		secret.Name,
+		secretResourceType,
+		secret.ID,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}
+
 func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error) {
 	b := &pagination.Bag{}
 	err := b.Unmarshal(token.Token)

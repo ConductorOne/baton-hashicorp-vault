@@ -19,6 +19,7 @@ const (
 	DefaultAddress      = "http://127.0.0.1:8200"
 	UsersEndpoint       = "v1/auth/userpass/users"
 	RolesEndpoint       = "v1/auth/approle/role"
+	SecretsEndpoint     = "v1/kv"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
@@ -111,6 +112,42 @@ func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, e
 	}
 
 	return users, nextPageToken, nil
+}
+
+func (h *HCPClient) ListAllSecrets(ctx context.Context) (*CommonAPIData, string, error) {
+	var nextPageToken string = ""
+	secrets, err := h.GetSecrets(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return secrets, nextPageToken, nil
+}
+
+// GetSecrets. List All Secrets.
+// https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v1#ttls
+func (h *HCPClient) GetSecrets(ctx context.Context) (*CommonAPIData, error) {
+	secretsUrl, err := url.JoinPath(h.baseUrl, SecretsEndpoint)
+	if err != nil {
+		return nil, err
+	}
+
+	uri, err := url.Parse(secretsUrl)
+	if err != nil {
+		return nil, err
+	}
+
+	var res *CommonAPIData
+	err = h.getAPIData(ctx,
+		MethodList,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 // GetUsers. List All Users.
