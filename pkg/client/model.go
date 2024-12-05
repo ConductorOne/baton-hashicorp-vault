@@ -68,3 +68,26 @@ type UserData struct {
 	TokenTTL             int      `json:"token_ttl,omitempty"`
 	TokenType            string   `json:"token_type,omitempty"`
 }
+
+type bodyUsers struct {
+	Password        string   `json:"password"`
+	TokenPolicies   []string `json:"token_policies"`
+	TokenBoundCidrs []string `json:"token_bound_cidrs"`
+}
+
+type bodyRoles struct {
+	TokenType     string   `json:"token_type"`
+	TokenTTL      string   `json:"token_ttl"`
+	TokenMaxTTL   string   `json:"token_max_ttl"`
+	TokenPolicies []string `json:"token_policies"`
+	Period        int      `json:"period"`
+	BindSecretID  bool     `json:"bind_secret_id"`
+}
+
+type bodyEnableAuth struct {
+	Type string `json:"type"`
+}
+
+type bodyUpdateUserPolicy struct {
+	TokenPolicies []string `json:"token_policies"`
+}

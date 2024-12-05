@@ -253,21 +253,21 @@ func (h *HCPClient) getAPIData(ctx context.Context,
 	uri *url.URL,
 	res any,
 ) error {
-	if _, _, err := h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
+	if _, err := h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (http.Header, any, error) {
+func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (any, error) {
 	var (
 		resp *http.Response
 		err  error
 	)
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	req, err := h.httpClient.NewRequest(ctx,
@@ -277,7 +277,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	switch method {
@@ -293,57 +293,42 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			if resp.StatusCode == http.StatusBadRequest {
 				bytes, err := io.ReadAll(resp.Body)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 
 				var cErr CustomErr
 				err = json.Unmarshal(bytes, &cErr)
 				if err != nil {
-					return nil, nil, err
+					return nil, err
 				}
 				// It is already authorized
 				if strings.Contains(cErr.Errors[0], "path is already in use") {
-					return nil, nil, nil
+					return nil, nil
 				}
 			}
 		}
 	}
 
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
-	return resp.Header, resp.StatusCode, nil
+	return resp.StatusCode, nil
 }
 
 // EnableAuthMethod. The approle auth method allows machines or apps to authenticate with Vault-defined roles.
 // An "AppRole" represents a set of Vault policies and login constraints that must be met to receive a token with those policies.
 // https://developer.hashicorp.com/vault/docs/auth/approle
 func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl string) error {
-	var (
-		body struct {
-			Type string `json:"type"`
-		}
-	)
-
-	auth, err := json.Marshal(authMethod)
-	if err != nil {
-		return err
-	}
-
-	payload := []byte(fmt.Sprintf(`{ "type": %s }`, auth))
-	err = json.Unmarshal(payload, &body)
-	if err != nil {
-		return err
-	}
-
 	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl)
 	if err != nil {
 		return err
 	}
 
 	var res any
-	if _, _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+	if _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyEnableAuth{
+		Type: authMethod,
+	}); err != nil {
 		return err
 	}
 
@@ -351,32 +336,18 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, authMethod, apiUrl str
 }
 
 func (h *HCPClient) AddUsers(ctx context.Context, name string) (any, error) {
-	var (
-		body struct {
-			Password        string   `json:"password"`
-			TokenPolicies   []string `json:"token_policies"`
-			TokenBoundCidrs []string `json:"token_bound_cidrs"`
-		}
-		statusCode any
-	)
-
-	payload := []byte(`{ 
-		"password": "superSecretPassword", 
-		"token_policies": ["admin", "default"], 
-		"token_bound_cidrs": ["127.0.0.1/32", "128.252.0.0/16"] 
-	}`)
-	err := json.Unmarshal(payload, &body)
-	if err != nil {
-		return nil, err
-	}
-
+	var statusCode any
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
 		return nil, err
 	}
 
 	var res any
-	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUsers{
+		Password:        "superSecretPassword",
+		TokenPolicies:   []string{"admin", "default"},
+		TokenBoundCidrs: []string{"127.0.0.1/32", "128.252.0.0/16"},
+	}); err != nil {
 		return nil, err
 	}
 
@@ -384,38 +355,21 @@ func (h *HCPClient) AddUsers(ctx context.Context, name string) (any, error) {
 }
 
 func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
-	var (
-		body struct {
-			TokenType     string   `json:"token_type"`
-			TokenTTL      string   `json:"token_ttl"`
-			TokenMaxTTL   string   `json:"token_max_ttl"`
-			TokenPolicies []string `json:"token_policies"`
-			Period        int      `json:"period"`
-			BindSecretID  bool     `json:"bind_secret_id"`
-		}
-		statusCode any
-	)
-
-	payload := []byte(`{
-		  "token_type": "batch",
-		  "token_ttl": "60m",
-		  "token_max_ttl": "180m",
-		  "token_policies": ["default"],
-		  "period": 0,
-		  "bind_secret_id": true
-		}`)
-	err := json.Unmarshal(payload, &body)
-	if err != nil {
-		return nil, err
-	}
-
+	var statusCode any
 	endpointUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint, name)
 	if err != nil {
 		return nil, err
 	}
 
 	var res any
-	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyRoles{
+		TokenType:     "batch",
+		TokenTTL:      "60m",
+		TokenMaxTTL:   "180m",
+		TokenPolicies: []string{"default"},
+		Period:        0,
+		BindSecretID:  true,
+	}); err != nil {
 		return nil, err
 	}
 
@@ -447,31 +401,16 @@ func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, err
 }
 
 func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) (any, error) {
-	var (
-		body struct {
-			TokenPolicies []string `json:"token_policies"`
-		}
-		statusCode any
-	)
-
-	policies, err := json.Marshal(policy)
-	if err != nil {
-		return nil, err
-	}
-
-	payload := []byte(fmt.Sprintf(`{ "token_policies": %s }`, policies))
-	err = json.Unmarshal(payload, &body)
-	if err != nil {
-		return nil, err
-	}
-
+	var statusCode any
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name, "policies")
 	if err != nil {
 		return nil, err
 	}
 
 	var res any
-	if _, statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUpdateUserPolicy{
+		TokenPolicies: policy,
+	}); err != nil {
 		return nil, err
 	}
 

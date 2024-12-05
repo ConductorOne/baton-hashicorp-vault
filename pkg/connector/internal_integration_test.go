@@ -3,9 +3,11 @@ package connector
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -116,46 +118,25 @@ func TestRoleBuilderList(t *testing.T) {
 	}
 }
 
-func TestAddUsers(t *testing.T) {
-	var count = 100
+func TestSecretsBuilderList(t *testing.T) {
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
 	}
 
 	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
 	require.Nil(t, err)
-	cli, err := client.New(context.Background(), cliTest)
-	require.Nil(t, err)
 
-	for i := 0; i < count; i++ {
-		seed := time.Now().UTC().UnixNano()
-		nameGenerator := namegenerator.NewNameGenerator(seed)
-		name, err := nameGenerator.Generate()
-		require.Nil(t, err)
-		code, err := cli.AddUsers(context.Background(), name)
-		require.Nil(t, err)
-		require.Equal(t, code, http.StatusNoContent)
+	s := &secretBuilder{
+		resourceType: secretResourceType,
+		client:       cliTest,
 	}
-}
-
-func TestAddRoles(t *testing.T) {
-	var count = 100
-	if vaultToken == "" && vaultHost == "" {
-		t.Skip()
-	}
-
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
-	require.Nil(t, err)
-	cli, err := client.New(context.Background(), cliTest)
-	require.Nil(t, err)
-	for i := 0; i < count; i++ {
-		seed := time.Now().UTC().UnixNano()
-		nameGenerator := namegenerator.NewNameGenerator(seed)
-		name, err := nameGenerator.Generate()
+	var token = "{}"
+	for token != "" {
+		_, tk, _, err := s.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
+			Token: token,
+		})
 		require.Nil(t, err)
-		code, err := cli.AddRoles(context.Background(), name)
-		require.Nil(t, err)
-		require.Equal(t, code, http.StatusNoContent)
+		token = tk
 	}
 }
 
@@ -251,4 +232,73 @@ func TestPolicyRevoke(t *testing.T) {
 		_, err = r.Revoke(ctxTest, gr)
 		require.Nil(t, err)
 	}
+}
+
+func TestAddUser(t *testing.T) {
+	var count = 100
+	if vaultToken == "" && vaultHost == "" {
+		t.Skip()
+	}
+
+	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	require.Nil(t, err)
+
+	cli, err := client.New(context.Background(), cliTest)
+	require.Nil(t, err)
+
+	output := []string{}
+	wg := sync.WaitGroup{}
+	done := make(chan bool)
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func(i int) {
+			name := strings.ReplaceAll(namegenerator.FULLNAMES[i], " ", "")
+			code, err := cli.AddUsers(context.Background(), name)
+			require.Nil(t, err)
+			require.Equal(t, code, http.StatusNoContent)
+			output = append(output, fmt.Sprintf("%v No. %d - %s", code, i, name))
+			log.Println(code, i, " ", name)
+			wg.Done()
+			done <- true
+		}(i)
+		<-done
+		time.Sleep(2 * time.Second)
+	}
+
+	log.Println(output)
+	wg.Wait()
+}
+
+func TestAddRoles(t *testing.T) {
+	var count = 100
+	if vaultToken == "" && vaultHost == "" {
+		t.Skip()
+	}
+
+	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	require.Nil(t, err)
+
+	cli, err := client.New(context.Background(), cliTest)
+	require.Nil(t, err)
+
+	output := []string{}
+	wg := sync.WaitGroup{}
+	done := make(chan bool)
+	for i := 0; i < count; i++ {
+		wg.Add(1)
+		go func(i int) {
+			name := strings.ReplaceAll(namegenerator.NAMES[i], " ", "")
+			code, err := cli.AddRoles(context.Background(), name)
+			require.Nil(t, err)
+			require.Equal(t, code, http.StatusNoContent)
+			output = append(output, fmt.Sprintf("%v No. %d - %s", code, i, name))
+			log.Println(code, i, " ", name)
+			wg.Done()
+			done <- true
+		}(i)
+		time.Sleep(2 * time.Second)
+	}
+
+	log.Println(output)
+	wg.Wait()
 }
