@@ -44,54 +44,11 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 	return nil, nil
 }
 
-func enableStores(ctx context.Context, hcpClient *client.HCPClient) error {
-	err := hcpClient.EnableAuthMethod(ctx, client.ApproleAuthEndpoint, client.BodyEnableAuth{
-		Type: "approle",
-	})
-	if err != nil {
-		return err
-	}
-
-	err = hcpClient.EnableAuthMethod(ctx, client.UserAuthEndpoint, client.BodyEnableAuth{
-		Type: "userpass",
-	})
-	if err != nil {
-		return err
-	}
-
-	err = hcpClient.EnableAuthMethod(ctx, client.KvAuthEndpoint, client.BodySecret{
-		Type:        "kv",
-		Description: "",
-		Config: client.Config{
-			Options:         nil,
-			DefaultLeaseTTL: "0s",
-			MaxLeaseTTL:     "0s",
-			ForceNoCache:    false,
-		},
-		Local:                 false,
-		SealWrap:              false,
-		ExternalEntropyAccess: false,
-		Options: client.Options{
-			Version: "1",
-		},
-	})
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // New returns a new instance of the connector.
 func New(ctx context.Context, token, host string, hcpClient *client.HCPClient) (*Connector, error) {
 	var err error
 	if token != "" && host != "" {
 		hcpClient, err = client.New(ctx, hcpClient)
-		if err != nil {
-			return nil, err
-		}
-
-		err = enableStores(ctx, hcpClient)
 		if err != nil {
 			return nil, err
 		}

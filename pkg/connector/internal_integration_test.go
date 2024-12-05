@@ -39,11 +39,6 @@ func getClientForTesting(ctx context.Context, host string) (*client.HCPClient, e
 		return nil, err
 	}
 
-	err = enableStores(ctx, hcpClient)
-	if err != nil {
-		return nil, err
-	}
-
 	return hcpClient, nil
 }
 
@@ -135,7 +130,39 @@ func TestSecretsBuilderList(t *testing.T) {
 	}
 }
 
-func TestGroupGrant(t *testing.T) {
+func parseEntitlementID(id string) (*v2.ResourceId, []string, error) {
+	parts := strings.Split(id, ":")
+	// Need to be at least 3 parts type:entitlement_id:slug
+	if len(parts) < 3 || len(parts) > 3 {
+		return nil, nil, fmt.Errorf("okta-connector: invalid resource id")
+	}
+
+	resourceId := &v2.ResourceId{
+		ResourceType: parts[0],
+		Resource:     strings.Join(parts[1:len(parts)-1], ":"),
+	}
+
+	return resourceId, parts, nil
+}
+
+func getEntitlementForTesting(resource *v2.Resource, resourceDisplayName, entitlement string) *v2.Entitlement {
+	options := []ent.EntitlementOption{
+		ent.WithGrantableTo(userResourceType),
+		ent.WithDisplayName(fmt.Sprintf("%s resource %s", resourceDisplayName, entitlement)),
+		ent.WithDescription(fmt.Sprintf("%s of %s hcp", entitlement, resourceDisplayName)),
+	}
+
+	return ent.NewAssignmentEntitlement(resource, entitlement, options...)
+}
+
+func getPolicyForTesting(ctxTest context.Context, id string, name string) (*v2.Resource, error) {
+	return policyResource(ctxTest, &client.APIResource{
+		ID:   id,
+		Name: name,
+	}, nil)
+}
+
+func TestPolicyGrant(t *testing.T) {
 	var roleEntitlement string
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
@@ -167,38 +194,6 @@ func TestGroupGrant(t *testing.T) {
 		},
 	}, entitlement)
 	require.Nil(t, err)
-}
-
-func parseEntitlementID(id string) (*v2.ResourceId, []string, error) {
-	parts := strings.Split(id, ":")
-	// Need to be at least 3 parts type:entitlement_id:slug
-	if len(parts) < 3 || len(parts) > 3 {
-		return nil, nil, fmt.Errorf("okta-connector: invalid resource id")
-	}
-
-	resourceId := &v2.ResourceId{
-		ResourceType: parts[0],
-		Resource:     strings.Join(parts[1:len(parts)-1], ":"),
-	}
-
-	return resourceId, parts, nil
-}
-
-func getEntitlementForTesting(resource *v2.Resource, resourceDisplayName, entitlement string) *v2.Entitlement {
-	options := []ent.EntitlementOption{
-		ent.WithGrantableTo(userResourceType),
-		ent.WithDisplayName(fmt.Sprintf("%s resource %s", resourceDisplayName, entitlement)),
-		ent.WithDescription(fmt.Sprintf("%s of %s hcp", entitlement, resourceDisplayName)),
-	}
-
-	return ent.NewAssignmentEntitlement(resource, entitlement, options...)
-}
-
-func getPolicyForTesting(ctxTest context.Context, id string, name string) (*v2.Resource, error) {
-	return policyResource(ctxTest, &client.APIResource{
-		ID:   id,
-		Name: name,
-	}, nil)
 }
 
 func TestPolicyRevoke(t *testing.T) {

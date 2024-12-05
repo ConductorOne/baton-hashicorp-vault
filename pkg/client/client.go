@@ -14,7 +14,6 @@ import (
 )
 
 const (
-	// AuthHeaderName is the name of the header containing the token.
 	AuthHeaderName      = "X-Vault-Token"
 	DefaultAddress      = "http://127.0.0.1:8200"
 	UsersEndpoint       = "v1/auth/userpass/users"
@@ -102,7 +101,50 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 		},
 	}
 
+	err = enableStores(ctx, &hcp)
+	if err != nil {
+		return nil, err
+	}
+
 	return &hcp, nil
+}
+
+func enableStores(ctx context.Context, hcpClient *HCPClient) error {
+	err := hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
+		Type: "approle",
+	})
+	if err != nil {
+		return err
+	}
+
+	err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
+		Type: "userpass",
+	})
+	if err != nil {
+		return err
+	}
+
+	err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
+		Type:        "kv",
+		Description: "",
+		Config: Config{
+			Options:         nil,
+			DefaultLeaseTTL: "0s",
+			MaxLeaseTTL:     "0s",
+			ForceNoCache:    false,
+		},
+		Local:                 false,
+		SealWrap:              false,
+		ExternalEntropyAccess: false,
+		Options: Options{
+			Version: "1",
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {
