@@ -128,3 +128,24 @@ type authMethodsAPIData struct {
 	Auth          interface{}            `json:"auth,omitempty"`
 	MountType     string                 `json:"mount_type,omitempty"`
 }
+
+type groupsAPIData struct {
+	RequestID     string `json:"request_id"`
+	LeaseID       string `json:"lease_id"`
+	Renewable     bool   `json:"renewable"`
+	LeaseDuration int    `json:"lease_duration"`
+	Data          struct {
+		KeyInfo map[string]group `json:"key_info"`
+		Keys    []string         `json:"keys"`
+	} `json:"data"`
+	WrapInfo  interface{} `json:"wrap_info"`
+	Warnings  interface{} `json:"warnings"`
+	Auth      interface{} `json:"auth"`
+	MountType string      `json:"mount_type"`
+}
+
+type group struct {
+	Name              string `json:"name"`
+	NumMemberEntities int    `json:"num_member_entities"`
+	NumParentGroups   int    `json:"num_parent_groups"`
+}

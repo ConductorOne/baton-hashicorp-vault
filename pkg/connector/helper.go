@@ -105,6 +105,30 @@ func secretResource(ctx context.Context, secret *client.APIResource, parentResou
 	return resource, nil
 }
 
+func groupResource(ctx context.Context, group *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	profile := map[string]interface{}{
+		"group_name": group.Name,
+		"group_id":   group.ID,
+	}
+
+	groupTraitOptions := []rs.GroupTraitOption{
+		rs.WithGroupProfile(profile),
+	}
+
+	resource, err := rs.NewGroupResource(
+		group.Name,
+		groupResourceType,
+		group.ID,
+		groupTraitOptions,
+	)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}
+
 func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error) {
 	b := &pagination.Bag{}
 	err := b.Unmarshal(token.Token)

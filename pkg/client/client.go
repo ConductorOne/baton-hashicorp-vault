@@ -20,6 +20,7 @@ const (
 	RolesEndpoint       = "v1/auth/approle/role"
 	KvEndpoint          = "v1/kv"
 	AuthMethodsEndpoint = "v1/sys/auth"
+	GroupsEndpoint      = "v1/identity/group/id"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
@@ -498,6 +499,30 @@ func (h *HCPClient) ListAllAuthenticationMethods(ctx context.Context) (*authMeth
 	var res *authMethodsAPIData
 	err = h.getAPIData(ctx,
 		http.MethodGet,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return res, "", nil
+}
+
+func (h *HCPClient) ListAllGroups(ctx context.Context) (*groupsAPIData, string, error) {
+	authUrl, err := url.JoinPath(h.baseUrl, GroupsEndpoint)
+	if err != nil {
+		return nil, "", err
+	}
+
+	uri, err := url.Parse(authUrl)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var res *groupsAPIData
+	err = h.getAPIData(ctx,
+		MethodList,
 		uri,
 		&res,
 	)
