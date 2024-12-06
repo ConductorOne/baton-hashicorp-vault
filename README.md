@@ -8,6 +8,13 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more the proje
 
 # Getting Started
 
+HashiCorp Vault is a tool that allows you to safely manage secrets. By secrets, we mean sensitive information like digital certificates, database credentials, passwords, and API encryption keys. Go to [https://portal.cloud.hashicorp.com/sign-up](https://portal.cloud.hashicorp.com/sign-up). Create an account and Sign in. 
+
+## Prerequisites
+
+Host(BATON_VAULT_HOST) and token(BATON_VAULT_TOKEN) for your HashiCorp account. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser. 
+Check out their [documentation](https://developer.hashicorp.com/vault/install) for more tips on getting started.
+
 ## brew
 
 ```
@@ -19,7 +26,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_DOMAIN_URL=domain_url -e BATON_API_KEY=apiKey -e BATON_USERNAME=username ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> -e BATON_USERNAME=username ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
@@ -33,11 +40,24 @@ baton-hashicorp-vault
 
 baton resources
 ```
+## Running locally
+
+Run the docker-compose file included in the connector for local testing.
+
+By using docker compose, you can run the following command to sync resources.
+```
+ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken
+```
 
 # Data Model
 
 `baton-hashicorp-vault` will pull down information about the following resources:
 - Users
+- Groups
+- Roles
+- Entities
+- Policies
+- Secrets
 
 # Contributing, Support and Issues
 
