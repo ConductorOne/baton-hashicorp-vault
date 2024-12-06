@@ -49,4 +49,11 @@ var (
 		Description: "Group of Hashicorp Vault",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_GROUP},
 	}
+
+	entityResourceType = &v2.ResourceType{
+		Id:          "entity",
+		DisplayName: "Entity",
+		Description: "Entity of Hashicorp Vault",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
+	}
 )

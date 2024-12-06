@@ -130,22 +130,36 @@ type authMethodsAPIData struct {
 }
 
 type groupsAPIData struct {
-	RequestID     string `json:"request_id"`
-	LeaseID       string `json:"lease_id"`
-	Renewable     bool   `json:"renewable"`
-	LeaseDuration int    `json:"lease_duration"`
-	Data          struct {
-		KeyInfo map[string]group `json:"key_info"`
-		Keys    []string         `json:"keys"`
-	} `json:"data"`
-	WrapInfo  interface{} `json:"wrap_info"`
-	Warnings  interface{} `json:"warnings"`
-	Auth      interface{} `json:"auth"`
-	MountType string      `json:"mount_type"`
+	RequestID     string      `json:"request_id,omitempty"`
+	LeaseID       string      `json:"lease_id,omitempty"`
+	Renewable     bool        `json:"renewable,omitempty"`
+	LeaseDuration int         `json:"lease_duration,omitempty"`
+	Data          genericData `json:"data,omitempty"`
+	WrapInfo      interface{} `json:"wrap_info,omitempty"`
+	Warnings      interface{} `json:"warnings,omitempty"`
+	Auth          interface{} `json:"auth,omitempty"`
+	MountType     string      `json:"mount_type,omitempty"`
 }
 
 type group struct {
-	Name              string `json:"name"`
-	NumMemberEntities int    `json:"num_member_entities"`
-	NumParentGroups   int    `json:"num_parent_groups"`
+	Name              string `json:"name,omitempty"`
+	NumMemberEntities int    `json:"num_member_entities,omitempty"`
+	NumParentGroups   int    `json:"num_parent_groups,omitempty"`
+}
+
+type entityAPIData struct {
+	RequestID     string      `json:"request_id,omitempty"`
+	LeaseID       string      `json:"lease_id,omitempty"`
+	Renewable     bool        `json:"renewable,omitempty"`
+	LeaseDuration int         `json:"lease_duration,omitempty"`
+	Data          genericData `json:"data,omitempty"`
+	WrapInfo      any         `json:"wrap_info,omitempty"`
+	Warnings      any         `json:"warnings,omitempty"`
+	Auth          any         `json:"auth,omitempty"`
+	MountType     string      `json:"mount_type,omitempty"`
+}
+
+type genericData struct {
+	KeyInfo map[string]group `json:"key_info,omitempty"`
+	Keys    []string         `json:"keys,omitempty"`
 }

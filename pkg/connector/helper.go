@@ -197,3 +197,27 @@ func authMethodResource(ctx context.Context, secret *client.APIResource, parentR
 
 	return resource, nil
 }
+
+func entityResource(ctx context.Context, entity *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	var opts []rs.ResourceOption
+	profile := map[string]interface{}{
+		"id":   entity.ID,
+		"name": entity.Name,
+	}
+
+	policyTraitOptions := []rs.AppTraitOption{
+		rs.WithAppProfile(profile),
+	}
+	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	resource, err := rs.NewResource(
+		entity.Name,
+		entityResourceType,
+		entity.ID,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}

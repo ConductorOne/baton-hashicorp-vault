@@ -23,6 +23,7 @@ func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.Reso
 		newSecretBuilder(d.client),
 		newAuthMethodBuilder(d.client),
 		newGroupBuilder(d.client),
+		newEntityBuilder(d.client),
 	}
 }
 

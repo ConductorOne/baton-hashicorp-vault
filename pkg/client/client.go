@@ -21,6 +21,7 @@ const (
 	KvEndpoint          = "v1/kv"
 	AuthMethodsEndpoint = "v1/sys/auth"
 	GroupsEndpoint      = "v1/identity/group/id"
+	EntityEndpoint      = "v1/identity/entity/id"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
@@ -510,17 +511,41 @@ func (h *HCPClient) ListAllAuthenticationMethods(ctx context.Context) (*authMeth
 }
 
 func (h *HCPClient) ListAllGroups(ctx context.Context) (*groupsAPIData, string, error) {
-	authUrl, err := url.JoinPath(h.baseUrl, GroupsEndpoint)
+	groupUrl, err := url.JoinPath(h.baseUrl, GroupsEndpoint)
 	if err != nil {
 		return nil, "", err
 	}
 
-	uri, err := url.Parse(authUrl)
+	uri, err := url.Parse(groupUrl)
 	if err != nil {
 		return nil, "", err
 	}
 
 	var res *groupsAPIData
+	err = h.getAPIData(ctx,
+		MethodList,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return res, "", nil
+}
+
+func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string, error) {
+	entityUrl, err := url.JoinPath(h.baseUrl, EntityEndpoint)
+	if err != nil {
+		return nil, "", err
+	}
+
+	uri, err := url.Parse(entityUrl)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var res *entityAPIData
 	err = h.getAPIData(ctx,
 		MethodList,
 		uri,
