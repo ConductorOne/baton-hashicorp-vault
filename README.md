@@ -1,6 +1,6 @@
 ![Baton Logo](./docs/images/baton-logo.png)
 
-# `baton-hashicorp-vault` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-hashicorp-vault.svg)](https://pkg.go.dev/github.com/conductorone/baton-hashicorp-vault) ![main ci](https://github.com/conductorone/baton-hashicorp-vault/actions/workflows/main.yaml/badge.svg)
+# `baton-freshservice` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-freshservice.svg)](https://pkg.go.dev/github.com/conductorone/baton-freshservice) ![main ci](https://github.com/conductorone/baton-freshservice/actions/workflows/main.yaml/badge.svg)
 
 `baton-hashicorp-vault` is a connector for built using the [Baton SDK](https://github.com/conductorone/baton-sdk).
 
@@ -12,7 +12,7 @@ HashiCorp Vault is a tool that allows you to safely manage secrets. By secrets, 
 
 ## Prerequisites
 
-Host(BATON_VAULT_HOST) and token(BATON_VAULT_TOKEN) for your HashiCorp account. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser. 
+Host and token for your HashiCorp account. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser. 
 Check out their [documentation](https://developer.hashicorp.com/vault/install) for more tips on getting started.
 
 ## brew
