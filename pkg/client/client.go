@@ -19,6 +19,7 @@ const (
 	UsersEndpoint       = "v1/auth/userpass/users"
 	RolesEndpoint       = "v1/auth/approle/role"
 	KvEndpoint          = "v1/kv"
+	AuthMethodsEndpoint = "v1/sys/auth"
 	policiesEndpoint    = "v1/sys/policy"
 	ApproleAuthEndpoint = "v1/sys/auth/approle"
 	UserAuthEndpoint    = "v1/sys/auth/userpass"
@@ -321,14 +322,15 @@ func getError(resp *http.Response) (CustomErr, error) {
 	return cErr, nil
 }
 
-func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (any, error) {
+func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (int, error) {
 	var (
-		resp *http.Response
-		err  error
+		resp       *http.Response
+		err        error
+		statusCode int
 	)
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
-		return nil, err
+		return statusCode, err
 	}
 
 	req, err := h.httpClient.NewRequest(ctx,
@@ -338,7 +340,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
-		return nil, err
+		return statusCode, err
 	}
 
 	switch method {
@@ -349,12 +351,12 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			if resp.StatusCode == http.StatusNotFound {
 				cErr, err := getError(resp)
 				if err != nil {
-					return nil, err
+					return statusCode, err
 				}
 
 				// There is no data
 				if len(cErr.Errors) == 0 {
-					return nil, nil
+					return statusCode, nil
 				}
 			}
 		}
@@ -365,19 +367,19 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			if resp.StatusCode == http.StatusBadRequest {
 				cErr, err := getError(resp)
 				if err != nil {
-					return nil, err
+					return statusCode, err
 				}
 
 				// It's already authorized
 				if strings.Contains(cErr.Errors[0], "path is already in use") {
-					return nil, nil
+					return statusCode, nil
 				}
 			}
 		}
 	}
 
 	if err != nil {
-		return nil, err
+		return statusCode, err
 	}
 
 	return resp.StatusCode, nil
@@ -480,6 +482,30 @@ func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, err
 	}
 
 	return res, nil
+}
+
+func (h *HCPClient) ListAllAuthenticationMethods(ctx context.Context) (*authMethodsAPIData, string, error) {
+	authUrl, err := url.JoinPath(h.baseUrl, AuthMethodsEndpoint)
+	if err != nil {
+		return nil, "", err
+	}
+
+	uri, err := url.Parse(authUrl)
+	if err != nil {
+		return nil, "", err
+	}
+
+	var res *authMethodsAPIData
+	err = h.getAPIData(ctx,
+		http.MethodGet,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return nil, "", err
+	}
+
+	return res, "", nil
 }
 
 // UpdateUserPolicy. Update policies for an existing user.

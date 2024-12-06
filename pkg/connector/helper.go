@@ -149,3 +149,27 @@ func handleToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*pagi
 
 	return bag, pageToken, nil
 }
+
+func authMethodResource(ctx context.Context, secret *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+	var opts []rs.ResourceOption
+	profile := map[string]interface{}{
+		"id":   secret.ID,
+		"name": secret.Name,
+	}
+
+	policyTraitOptions := []rs.AppTraitOption{
+		rs.WithAppProfile(profile),
+	}
+	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	resource, err := rs.NewResource(
+		secret.Name,
+		authMethodResourceType,
+		secret.ID,
+		opts...,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return resource, nil
+}

@@ -34,4 +34,10 @@ var (
 		Description: "Secret of Hashicorp Vault",
 		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
+	authMethodResourceType = &v2.ResourceType{
+		Id:          "auth_method",
+		DisplayName: "Authentication Method",
+		Description: "Authentication Methods of Hashicorp Vault",
+		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
+	}
 )

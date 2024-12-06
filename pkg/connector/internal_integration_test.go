@@ -130,6 +130,28 @@ func TestSecretsBuilderList(t *testing.T) {
 	}
 }
 
+func TestAuthMethodsBuilderList(t *testing.T) {
+	if vaultToken == "" && vaultHost == "" {
+		t.Skip()
+	}
+
+	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	require.Nil(t, err)
+
+	a := &authMethodBuilder{
+		resourceType: authMethodResourceType,
+		client:       cliTest,
+	}
+	var token = "{}"
+	for token != "" {
+		_, tk, _, err := a.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
+			Token: token,
+		})
+		require.Nil(t, err)
+		token = tk
+	}
+}
+
 func parseEntitlementID(id string) (*v2.ResourceId, []string, error) {
 	parts := strings.Split(id, ":")
 	// Need to be at least 3 parts type:entitlement_id:slug
