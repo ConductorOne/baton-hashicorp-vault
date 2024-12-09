@@ -54,7 +54,7 @@ jobs:
         run: docker compose up -d vault
       - name: Run baton-hashicorp-vault
         env:
-          BATON_VAULT_HOST: ${{ secrets.BATON_VAULT_HOST }}
+          BATON_VAULT_HOST: http://127.0.0.1:8200
           BATON_VAULT_TOKEN: ${{ secrets.BATON_VAULT_TOKEN }}
           BATON_DISABLE_HTTP_CACHE: true
         run: ./baton-hashicorp-vault
