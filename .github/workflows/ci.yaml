@@ -50,12 +50,14 @@ jobs:
         uses: actions/checkout@v4
       - name: Build baton-hashicorp-vault
         run: go build ./cmd/baton-hashicorp-vault
-      # - name: Run baton-hashicorp-vault
-      #   env:
-      #     BATON_VAULT_HOST: ${{ secrets.BATON_VAULT_HOST }}
-      #     BATON_VAULT_TOKEN: ${{ secrets.BATON_VAULT_TOKEN }}
-      #     BATON_DISABLE_HTTP_CACHE: true
-      #   run: ./baton-hashicorp-vault
+      - name: Run docker compose
+        run: docker compose up -d vault
+      - name: Run baton-hashicorp-vault
+        env:
+          BATON_VAULT_HOST: ${{ secrets.BATON_VAULT_HOST }}
+          BATON_VAULT_TOKEN: ${{ secrets.BATON_VAULT_TOKEN }}
+          BATON_DISABLE_HTTP_CACHE: true
+        run: ./baton-hashicorp-vault
       - name: Checkout baton
         uses: actions/checkout@v4
         with:
