@@ -61,7 +61,7 @@ jobs:
       - name: Import Secrets
         id: import-secrets
         # use the local changes
-        uses: ./
+        uses: hashicorp/vault-action@v2.1.2
         with:
           url: http://localhost:8200
           method: token
