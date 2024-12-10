@@ -91,8 +91,8 @@ jobs:
           BATON_HCP: ./baton-hashicorp-vault
           BATON_VAULT_TOKEN: ${{ env.BATON_VAULT_TOKEN }}
           BATON_VAULT_HOST: ${{ env.BATON_VAULT_HOST }}
-          BATON_GRANT: 'policy:admin:member:user:mitchellh'
-          BATON_ENTITLEMENT: 'policy:admin:assigned'
+          BATON_GRANT: 'policy:default:assigned:user:mitchellh'
+          BATON_ENTITLEMENT: 'policy:default:assigned'
           BATON_PRINCIPAL_TYPE: 'user'
           BATON_PRINCIPAL: 'mitchellh'
         run: ./test/grant-revoke.sh
