@@ -149,7 +149,13 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 
 	var policies = []string{}
 	policies = append(policies, userInfo.Data.TokenPolicies...)
-	policies = append(policies, policyId)
+	posPolicy := slices.IndexFunc(policies, func(c string) bool {
+		return c == policyId
+	})
+	if posPolicy == NF {
+		policies = append(policies, policyId)
+	}
+
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
 		return nil, err
