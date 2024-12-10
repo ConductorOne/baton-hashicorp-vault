@@ -26,7 +26,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		rv  []*v2.Resource
 	)
 
-	bag, _, err := handleToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, userResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}

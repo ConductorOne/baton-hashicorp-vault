@@ -3,7 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"slices"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -88,7 +87,7 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 		err error
 		rv  []*v2.Grant
 	)
-	bag, _, err := handleToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, userResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}
@@ -163,16 +162,9 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 	}
 
 	policies = append(policies, policyId)
-	statusCode, err := p.client.UpdateUserPolicy(ctx, policies, userId)
+	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
 		return nil, err
-	}
-
-	if http.StatusNoContent == statusCode {
-		l.Warn("Policy Membership has been created.",
-			zap.String("userId", userId),
-			zap.String("policyId", policyId),
-		)
 	}
 
 	return nil, nil
@@ -214,16 +206,9 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 	}
 
 	policies = RemoveIndex(policies, posPolicy)
-	statusCode, err := p.client.UpdateUserPolicy(ctx, policies, userId)
+	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
 		return nil, err
-	}
-
-	if http.StatusNoContent == statusCode {
-		l.Warn("Policy Membership has been revoked.",
-			zap.String("userId", userId),
-			zap.String("policyId", policyId),
-		)
 	}
 
 	return nil, nil

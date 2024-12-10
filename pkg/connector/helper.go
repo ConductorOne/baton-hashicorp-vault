@@ -151,7 +151,7 @@ func RemoveIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
 
-func handleToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*pagination.Bag, int, error) {
+func getToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*pagination.Bag, int, error) {
 	var pageToken int
 	_, bag, err := unmarshalSkipToken(pToken)
 	if err != nil {

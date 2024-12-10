@@ -154,23 +154,21 @@ func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 }
 
 func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {
-	var nextPageToken string = ""
 	users, err := h.GetUsers(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return users, nextPageToken, nil
+	return users, "", nil
 }
 
 func (h *HCPClient) ListAllSecrets(ctx context.Context) (*CommonAPIData, string, error) {
-	var nextPageToken string = ""
 	secrets, err := h.GetSecrets(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return secrets, nextPageToken, nil
+	return secrets, "", nil
 }
 
 // GetSecrets. List All Secrets.
@@ -226,13 +224,12 @@ func (h *HCPClient) GetUsers(ctx context.Context) (*CommonAPIData, error) {
 }
 
 func (h *HCPClient) ListAllRoles(ctx context.Context) (*CommonAPIData, string, error) {
-	var nextPageToken string = ""
 	roles, err := h.GetRoles(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return roles, nextPageToken, nil
+	return roles, "", nil
 }
 
 // GetUsers. List All Users.
@@ -262,13 +259,12 @@ func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 }
 
 func (h *HCPClient) ListAllPolicies(ctx context.Context) (*PolicyAPIData, string, error) {
-	var nextPageToken string = ""
 	policies, err := h.GetPolicies(ctx)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return policies, nextPageToken, nil
+	return policies, "", nil
 }
 
 // GetPolicies. List All Policies.
@@ -302,7 +298,7 @@ func (h *HCPClient) getAPIData(ctx context.Context,
 	uri *url.URL,
 	res any,
 ) error {
-	if _, err := h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
+	if err := h.doRequest(ctx, method, uri.String(), &res, nil); err != nil {
 		return err
 	}
 
@@ -324,15 +320,14 @@ func getError(resp *http.Response) (CustomErr, error) {
 	return cErr, nil
 }
 
-func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) (int, error) {
+func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) error {
 	var (
-		resp       *http.Response
-		err        error
-		statusCode int
+		resp *http.Response
+		err  error
 	)
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
-		return statusCode, err
+		return err
 	}
 
 	req, err := h.httpClient.NewRequest(ctx,
@@ -342,7 +337,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
-		return statusCode, err
+		return err
 	}
 
 	switch method {
@@ -353,12 +348,12 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			if resp.StatusCode == http.StatusNotFound {
 				cErr, err := getError(resp)
 				if err != nil {
-					return statusCode, err
+					return err
 				}
 
 				// There is no data
 				if len(cErr.Errors) == 0 {
-					return statusCode, nil
+					return nil
 				}
 			}
 		}
@@ -369,22 +364,22 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			if resp.StatusCode == http.StatusBadRequest {
 				cErr, err := getError(resp)
 				if err != nil {
-					return statusCode, err
+					return err
 				}
 
 				// It's already authorized
 				if strings.Contains(cErr.Errors[0], "path is already in use") {
-					return statusCode, nil
+					return nil
 				}
 			}
 		}
 	}
 
 	if err != nil {
-		return statusCode, err
+		return err
 	}
 
-	return resp.StatusCode, nil
+	return nil
 }
 
 // EnableAuthMethod. Enables you to use an auth method.
@@ -397,41 +392,39 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body an
 	}
 
 	var res any
-	if _, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
+	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, body); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func (h *HCPClient) AddUsers(ctx context.Context, name string) (any, error) {
-	var statusCode any
+func (h *HCPClient) AddUsers(ctx context.Context, name string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var res any
-	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUsers{
+	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUsers{
 		Password:        "superSecretPassword",
 		TokenPolicies:   []string{"admin", "default"},
 		TokenBoundCidrs: []string{"127.0.0.1/32", "128.252.0.0/16"},
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	return statusCode, nil
+	return nil
 }
 
-func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
-	var statusCode any
+func (h *HCPClient) AddRoles(ctx context.Context, name string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint, name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var res any
-	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyRoles{
+	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyRoles{
 		TokenType:     "batch",
 		TokenTTL:      "60m",
 		TokenMaxTTL:   "180m",
@@ -439,27 +432,26 @@ func (h *HCPClient) AddRoles(ctx context.Context, name string) (any, error) {
 		Period:        0,
 		BindSecretID:  true,
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	return statusCode, nil
+	return nil
 }
 
-func (h *HCPClient) AddSecrets(ctx context.Context, name, value string) (any, error) {
-	var statusCode any
+func (h *HCPClient) AddSecrets(ctx context.Context, name, value string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, KvEndpoint, name)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var res any
-	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodySecrets{
+	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodySecrets{
 		MyValue: value,
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	return statusCode, nil
+	return nil
 }
 
 func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, error) {
@@ -560,19 +552,18 @@ func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string
 
 // UpdateUserPolicy. Update policies for an existing user.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#update-policies-on-user
-func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) (any, error) {
-	var statusCode any
+func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name, "policies")
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	var res any
-	if statusCode, err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUpdateUserPolicy{
+	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUpdateUserPolicy{
 		TokenPolicies: policy,
 	}); err != nil {
-		return nil, err
+		return err
 	}
 
-	return statusCode, nil
+	return nil
 }

@@ -24,7 +24,7 @@ func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		rv  []*v2.Resource
 	)
 
-	bag, _, err := handleToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, userResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}

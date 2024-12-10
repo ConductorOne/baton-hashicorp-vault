@@ -3,8 +3,6 @@ package connector
 import (
 	"context"
 	"fmt"
-	"log"
-	"net/http"
 	"os"
 	"strings"
 	"sync"
@@ -303,18 +301,14 @@ func TestAddUsers(t *testing.T) {
 	cli, err := client.New(context.Background(), cliTest)
 	require.Nil(t, err)
 
-	output := []string{}
 	wg := sync.WaitGroup{}
 	done := make(chan bool)
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
 			name := strings.ReplaceAll(namegenerator.FULLNAMES[i], " ", "")
-			code, err := cli.AddUsers(context.Background(), name)
+			err := cli.AddUsers(context.Background(), name)
 			require.Nil(t, err)
-			require.Equal(t, code, http.StatusNoContent)
-			output = append(output, fmt.Sprintf("%v No. %d - %s", code, i, name))
-			log.Println(code, i, " ", name)
 			wg.Done()
 			done <- true
 		}(i)
@@ -322,7 +316,6 @@ func TestAddUsers(t *testing.T) {
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Println(output)
 	wg.Wait()
 }
 
@@ -338,25 +331,20 @@ func TestAddRoles(t *testing.T) {
 	cli, err := client.New(context.Background(), cliTest)
 	require.Nil(t, err)
 
-	output := []string{}
 	wg := sync.WaitGroup{}
 	done := make(chan bool)
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
 			name := strings.ReplaceAll(namegenerator.NAMES[i], " ", "")
-			code, err := cli.AddRoles(context.Background(), name)
+			err := cli.AddRoles(context.Background(), name)
 			require.Nil(t, err)
-			require.Equal(t, code, http.StatusNoContent)
-			output = append(output, fmt.Sprintf("%v No. %d - %s", code, i, name))
-			log.Println(code, i, " ", name)
 			wg.Done()
 			done <- true
 		}(i)
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Println(output)
 	wg.Wait()
 }
 
@@ -372,7 +360,6 @@ func TestAddSecrets(t *testing.T) {
 	cli, err := client.New(context.Background(), cliTest)
 	require.Nil(t, err)
 
-	output := []string{}
 	wg := sync.WaitGroup{}
 	done := make(chan bool)
 	for i := 0; i < count; i++ {
@@ -380,17 +367,13 @@ func TestAddSecrets(t *testing.T) {
 		go func(i int) {
 			name := strings.ReplaceAll(namegenerator.NAMES[i], " ", "")
 			value := strings.ReplaceAll(namegenerator.LASTNAMES[i], " ", "")
-			code, err := cli.AddSecrets(context.Background(), name, value)
+			err := cli.AddSecrets(context.Background(), name, value)
 			require.Nil(t, err)
-			require.Equal(t, code, http.StatusNoContent)
-			output = append(output, fmt.Sprintf("%v No. %d - %s", code, i, name))
-			log.Println(code, i, " ", name)
 			wg.Done()
 			done <- true
 		}(i)
 		time.Sleep(2 * time.Second)
 	}
 
-	log.Println(output)
 	wg.Wait()
 }
