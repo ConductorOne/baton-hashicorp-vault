@@ -41,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       BATON_LOG_LEVEL: debug
+      BATON_VAULT_HOST: 'http://127.0.0.1:8200'
       BATON_VAULT_TOKEN: 'testtoken'
     steps:
       - name: Install Go
@@ -72,7 +73,7 @@ jobs:
           command: |
             curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -f http://127.0.0.1:8200/v1/sys/auth
       - name: Run baton-hashicorp-vault
-        run: ./baton-hashicorp-vault  --vault-host 'http://127.0.0.1:8200' --vault-token '${{env.BATON_VAULT_TOKEN}}'
+        run: ./baton-hashicorp-vault  --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
       # - name: Test grant/revoking policy
       #   env:
       #     BATON: ./baton/baton
