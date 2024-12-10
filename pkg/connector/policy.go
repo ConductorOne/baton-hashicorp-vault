@@ -112,13 +112,13 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 			if userPolicy != resource.Id.Resource {
 				continue
 			}
-		}
 
-		grant := grant.NewGrant(resource, assignedEntitlement, &v2.ResourceId{
-			ResourceType: userResourceType.Id,
-			Resource:     user,
-		})
-		rv = append(rv, grant)
+			grant := grant.NewGrant(resource, assignedEntitlement, &v2.ResourceId{
+				ResourceType: userResourceType.Id,
+				Resource:     user,
+			})
+			rv = append(rv, grant)
+		}
 	}
 
 	nextPageToken, err = bag.Marshal()

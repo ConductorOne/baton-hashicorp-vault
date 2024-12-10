@@ -236,9 +236,9 @@ func TestPolicyGrant(t *testing.T) {
 	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
 	require.Nil(t, err)
 
-	grantEntitlement := "policy:root:assigned"
+	grantEntitlement := "policy:default:assigned"
 	grantPrincipalType := "user"
-	grantPrincipal := "adleyberry"
+	grantPrincipal := "mitchellh"
 	_, data, err := parseEntitlementID(grantEntitlement)
 	require.Nil(t, err)
 	require.NotNil(t, data)
@@ -266,7 +266,7 @@ func TestPolicyRevoke(t *testing.T) {
 		t.Skip()
 	}
 
-	revokeGrant := strings.Split("policy:root:assigned:user:adleyberry", ":")
+	revokeGrant := strings.Split("policy:default:assigned:user:mitchellh", ":")
 	if len(revokeGrant) >= 1 && len(revokeGrant) <= 5 {
 		policyId := revokeGrant[1]
 		userId := revokeGrant[4]
@@ -376,4 +376,22 @@ func TestAddSecrets(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+func TestPolicyGrants(t *testing.T) {
+	if vaultToken == "" && vaultHost == "" {
+		t.Skip()
+	}
+
+	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	require.Nil(t, err)
+
+	d := &policyBuilder{
+		resourceType: policyResourceType,
+		client:       cliTest,
+	}
+	_, _, _, err = d.Grants(ctxTest, &v2.Resource{
+		Id: &v2.ResourceId{ResourceType: policyResourceType.Id, Resource: "root"},
+	}, &pagination.Token{})
+	require.Nil(t, err)
 }

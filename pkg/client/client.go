@@ -531,7 +531,7 @@ func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string
 // UpdateUserPolicy. Update policies for an existing user.
 // https://developer.hashicorp.com/vault/api-docs/auth/userpass#update-policies-on-user
 func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) error {
-	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name, "policies")
+	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
 		return err
 	}
