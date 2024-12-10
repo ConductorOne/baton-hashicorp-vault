@@ -72,18 +72,17 @@ jobs:
           retry_on: error
           command: |
             curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -f http://127.0.0.1:8200/v1/sys/auth
-            curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd"}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
       - name: Run baton-hashicorp-vault
         run: ./baton-hashicorp-vault  --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
-      # - name: Adding user
-      #   uses: nick-fields/retry@v3
-      #   with:
-      #     timeout_seconds: 5
-      #     retry_wait_seconds: 10
-      #     max_attempts: 10
-      #     retry_on: error
-      #     command: |
-      #       curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd"}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
+      - name: Adding user
+        uses: nick-fields/retry@v3
+        with:
+          timeout_seconds: 5
+          retry_wait_seconds: 10
+          max_attempts: 10
+          retry_on: error
+          command: |
+            curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd"}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
       - name: Run baton-hashicorp-vault
         run: ./baton-hashicorp-vault --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
       - name: Test grant/revoking policy
