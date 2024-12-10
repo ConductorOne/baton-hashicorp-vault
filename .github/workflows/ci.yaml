@@ -82,7 +82,7 @@ jobs:
           max_attempts: 10
           retry_on: error
           command: |
-            curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd"}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
+            curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd", "token_policies": ["root", "default"]}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
       - name: Run baton-hashicorp-vault
         run: ./baton-hashicorp-vault --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
       - name: Test grant/revoking policy
