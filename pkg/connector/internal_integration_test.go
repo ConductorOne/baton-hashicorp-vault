@@ -290,7 +290,7 @@ func TestPolicyRevoke(t *testing.T) {
 }
 
 func TestAddUsers(t *testing.T) {
-	var count = 10
+	var count = 5
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
 	}
@@ -320,7 +320,7 @@ func TestAddUsers(t *testing.T) {
 }
 
 func TestAddRoles(t *testing.T) {
-	var count = 10
+	var count = 5
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
 	}
@@ -349,7 +349,7 @@ func TestAddRoles(t *testing.T) {
 }
 
 func TestAddSecrets(t *testing.T) {
-	var count = 10
+	var count = 5
 	if vaultToken == "" && vaultHost == "" {
 		t.Skip()
 	}

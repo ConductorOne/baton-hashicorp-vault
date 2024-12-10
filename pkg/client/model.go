@@ -5,15 +5,9 @@ type auth struct {
 }
 
 type CommonAPIData struct {
-	RequestID     string      `json:"request_id,omitempty"`
-	LeaseID       string      `json:"lease_id,omitempty"`
-	Renewable     bool        `json:"renewable,omitempty"`
-	LeaseDuration int         `json:"lease_duration,omitempty"`
-	Data          Data        `json:"data,omitempty"`
-	WrapInfo      interface{} `json:"wrap_info,omitempty"`
-	Warnings      interface{} `json:"warnings,omitempty"`
-	Auth          interface{} `json:"auth,omitempty"`
-	MountType     string      `json:"mount_type,omitempty"`
+	RequestID string `json:"request_id,omitempty"`
+	Data      Data   `json:"data,omitempty"`
+	MountType string `json:"mount_type,omitempty"`
 }
 
 type Data struct {
@@ -27,17 +21,11 @@ type APIResource struct {
 }
 
 type PolicyAPIData struct {
-	Keys          []string    `json:"keys,omitempty"`
-	Policies      []string    `json:"policies,omitempty"`
-	RequestID     string      `json:"request_id,omitempty"`
-	LeaseID       string      `json:"lease_id,omitempty"`
-	Renewable     bool        `json:"renewable,omitempty"`
-	LeaseDuration int         `json:"lease_duration,omitempty"`
-	Data          PolicyData  `json:"data,omitempty"`
-	WrapInfo      interface{} `json:"wrap_info,omitempty"`
-	Warnings      interface{} `json:"warnings,omitempty"`
-	Auth          interface{} `json:"auth,omitempty"`
-	MountType     string      `json:"mount_type,omitempty"`
+	Keys      []string   `json:"keys,omitempty"`
+	Policies  []string   `json:"policies,omitempty"`
+	RequestID string     `json:"request_id,omitempty"`
+	Data      PolicyData `json:"data,omitempty"`
+	MountType string     `json:"mount_type,omitempty"`
 }
 
 type PolicyData struct {
@@ -46,15 +34,9 @@ type PolicyData struct {
 }
 
 type UserAPIData struct {
-	RequestID     string      `json:"request_id,omitempty"`
-	LeaseID       string      `json:"lease_id,omitempty"`
-	Renewable     bool        `json:"renewable,omitempty"`
-	LeaseDuration int         `json:"lease_duration,omitempty"`
-	Data          UserData    `json:"data,omitempty"`
-	WrapInfo      interface{} `json:"wrap_info,omitempty"`
-	Warnings      interface{} `json:"warnings,omitempty"`
-	Auth          interface{} `json:"auth,omitempty"`
-	MountType     string      `json:"mount_type,omitempty"`
+	RequestID string   `json:"request_id,omitempty"`
+	Data      UserData `json:"data,omitempty"`
+	MountType string   `json:"mount_type,omitempty"`
 }
 
 type UserData struct {
@@ -118,27 +100,15 @@ type bodySecrets struct {
 }
 
 type authMethodsAPIData struct {
-	RequestID     string                 `json:"request_id,omitempty"`
-	LeaseID       string                 `json:"lease_id,omitempty"`
-	Renewable     bool                   `json:"renewable,omitempty"`
-	LeaseDuration int                    `json:"lease_duration,omitempty"`
-	Data          map[string]interface{} `json:"data,omitempty"`
-	WrapInfo      interface{}            `json:"wrap_info,omitempty"`
-	Warnings      interface{}            `json:"warnings,omitempty"`
-	Auth          interface{}            `json:"auth,omitempty"`
-	MountType     string                 `json:"mount_type,omitempty"`
+	RequestID string                 `json:"request_id,omitempty"`
+	Data      map[string]interface{} `json:"data,omitempty"`
+	MountType string                 `json:"mount_type,omitempty"`
 }
 
 type groupsAPIData struct {
-	RequestID     string      `json:"request_id,omitempty"`
-	LeaseID       string      `json:"lease_id,omitempty"`
-	Renewable     bool        `json:"renewable,omitempty"`
-	LeaseDuration int         `json:"lease_duration,omitempty"`
-	Data          genericData `json:"data,omitempty"`
-	WrapInfo      interface{} `json:"wrap_info,omitempty"`
-	Warnings      interface{} `json:"warnings,omitempty"`
-	Auth          interface{} `json:"auth,omitempty"`
-	MountType     string      `json:"mount_type,omitempty"`
+	RequestID string      `json:"request_id,omitempty"`
+	Data      genericData `json:"data,omitempty"`
+	MountType string      `json:"mount_type,omitempty"`
 }
 
 type group struct {
@@ -148,15 +118,10 @@ type group struct {
 }
 
 type entityAPIData struct {
-	RequestID     string      `json:"request_id,omitempty"`
-	LeaseID       string      `json:"lease_id,omitempty"`
-	Renewable     bool        `json:"renewable,omitempty"`
-	LeaseDuration int         `json:"lease_duration,omitempty"`
-	Data          genericData `json:"data,omitempty"`
-	WrapInfo      any         `json:"wrap_info,omitempty"`
-	Warnings      any         `json:"warnings,omitempty"`
-	Auth          any         `json:"auth,omitempty"`
-	MountType     string      `json:"mount_type,omitempty"`
+	RequestID string      `json:"request_id,omitempty"`
+	Data      genericData `json:"data,omitempty"`
+	Auth      any         `json:"auth,omitempty"`
+	MountType string      `json:"mount_type,omitempty"`
 }
 
 type genericData struct {
