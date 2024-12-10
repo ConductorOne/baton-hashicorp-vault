@@ -190,16 +190,10 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 	posPolicy := slices.IndexFunc(policies, func(c string) bool {
 		return c == policyId
 	})
-	if posPolicy == NF {
-		l.Warn(
-			"hcp-connector: user does not have this policy",
-			zap.String("principal_id", principal.Id.String()),
-			zap.String("principal_type", principal.Id.ResourceType),
-		)
-		return nil, fmt.Errorf("hcp-connector: user %s does not have this policy %s", userId, policyId)
+	if posPolicy != NF {
+		policies = RemoveIndex(policies, posPolicy)
 	}
 
-	policies = RemoveIndex(policies, posPolicy)
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
 		return nil, err
