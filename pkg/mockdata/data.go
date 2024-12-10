@@ -1,4 +1,4 @@
-package namegenerator
+package mockdata
 
 var (
 	FULLNAMES = []string{
@@ -1004,6 +1004,7 @@ var (
 		"Victoria Owens",
 		"Adriel Hull",
 	}
+
 	NAMES = []string{
 		"Sophia",
 		"Emma",

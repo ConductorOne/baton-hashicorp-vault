@@ -131,20 +131,7 @@ func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 	}
 
 	err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
-		Type:        kvType,
-		Description: "",
-		Config: Config{
-			Options:         nil,
-			DefaultLeaseTTL: "0s",
-			MaxLeaseTTL:     "0s",
-			ForceNoCache:    false,
-		},
-		Local:                 false,
-		SealWrap:              false,
-		ExternalEntropyAccess: false,
-		Options: Options{
-			Version: "1",
-		},
+		Type: kvType,
 	})
 	if err != nil {
 		return err
@@ -345,33 +332,24 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		resp, err = h.httpClient.Do(req, uhttp.WithResponse(&res))
 		if resp != nil {
 			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusNotFound {
-				cErr, err := getError(resp)
-				if err != nil {
-					return err
-				}
-
-				// There is no data
-				if len(cErr.Errors) == 0 {
-					return nil
-				}
-			}
 		}
 	case http.MethodPost:
 		resp, err = h.httpClient.Do(req)
 		if resp != nil {
 			defer resp.Body.Close()
-			if resp.StatusCode == http.StatusBadRequest {
-				cErr, err := getError(resp)
-				if err != nil {
-					return err
-				}
+		}
+	}
 
-				// It's already authorized
-				if strings.Contains(cErr.Errors[0], "path is already in use") {
-					return nil
-				}
-			}
+	if resp != nil && (resp.StatusCode == http.StatusNotFound ||
+		resp.StatusCode == http.StatusBadRequest) {
+		cErr, err := getError(resp)
+		if err != nil {
+			return err
+		}
+
+		// There is no data ot It's already authorized
+		if len(cErr.Errors) == 0 || strings.Contains(cErr.Errors[0], "path is already in use") {
+			return nil
 		}
 	}
 

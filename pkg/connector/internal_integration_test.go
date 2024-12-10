@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
-	"github.com/conductorone/baton-hashicorp-vault/pkg/namegenerator"
+	"github.com/conductorone/baton-hashicorp-vault/pkg/mockdata"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
@@ -306,7 +306,7 @@ func TestAddUsers(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
-			name := strings.ReplaceAll(namegenerator.FULLNAMES[i], " ", "")
+			name := strings.ReplaceAll(mockdata.FULLNAMES[i], " ", "")
 			err := cli.AddUsers(context.Background(), name)
 			require.Nil(t, err)
 			wg.Done()
@@ -336,7 +336,7 @@ func TestAddRoles(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
-			name := strings.ReplaceAll(namegenerator.NAMES[i], " ", "")
+			name := strings.ReplaceAll(mockdata.NAMES[i], " ", "")
 			err := cli.AddRoles(context.Background(), name)
 			require.Nil(t, err)
 			wg.Done()
@@ -365,8 +365,8 @@ func TestAddSecrets(t *testing.T) {
 	for i := 0; i < count; i++ {
 		wg.Add(1)
 		go func(i int) {
-			name := strings.ReplaceAll(namegenerator.NAMES[i], " ", "")
-			value := strings.ReplaceAll(namegenerator.LASTNAMES[i], " ", "")
+			name := strings.ReplaceAll(mockdata.NAMES[i], " ", "")
+			value := strings.ReplaceAll(mockdata.LASTNAMES[i], " ", "")
 			err := cli.AddSecrets(context.Background(), name, value)
 			require.Nil(t, err)
 			wg.Done()

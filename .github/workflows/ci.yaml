@@ -74,14 +74,25 @@ jobs:
             curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -f http://127.0.0.1:8200/v1/sys/auth
       - name: Run baton-hashicorp-vault
         run: ./baton-hashicorp-vault  --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
+      - name: Adding user
+        uses: nick-fields/retry@v3
+        with:
+          timeout_seconds: 5
+          retry_wait_seconds: 10
+          max_attempts: 10
+          retry_on: error
+          command: |
+            curl -H "X-Vault-Token: ${{env.BATON_VAULT_TOKEN}}" -X POST -d '{"password": "pwd"}' -f http://127.0.0.1:8200/v1/auth/userpass/users/mitchellh
+      - name: Run baton-hashicorp-vault
+        run: ./baton-hashicorp-vault  --vault-host '${{env.BATON_VAULT_HOST}}' --vault-token '${{env.BATON_VAULT_TOKEN}}'
       # - name: Test grant/revoking policy
       #   env:
       #     BATON: ./baton/baton
       #     BATON_HCP: ./baton-hashicorp-vault
       #     BATON_VAULT_TOKEN: ${{ env.BATON_VAULT_TOKEN }}
       #     BATON_VAULT_HOST: ${{ env.BATON_VAULT_HOST }}
-      #     BATON_GRANT: 'policy:root:member:user:adleyberry'
+      #     BATON_GRANT: 'policy:root:member:user:mitchellh'
       #     BATON_ENTITLEMENT: 'policy:root:assigned'
       #     BATON_PRINCIPAL_TYPE: 'user'
-      #     BATON_PRINCIPAL: 'adleyberry'
+      #     BATON_PRINCIPAL: 'mitchellh'
       #   run: ./test/grant-revoke.sh
