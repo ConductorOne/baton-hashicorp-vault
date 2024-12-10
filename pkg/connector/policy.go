@@ -149,18 +149,6 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 
 	var policies = []string{}
 	policies = append(policies, userInfo.Data.TokenPolicies...)
-	posPolicy := slices.IndexFunc(policies, func(c string) bool {
-		return c == policyId
-	})
-	if posPolicy != NF {
-		l.Warn(
-			"hcp-connector: user already has this policy",
-			zap.String("principal_id", principal.Id.String()),
-			zap.String("principal_type", principal.Id.ResourceType),
-		)
-		return nil, fmt.Errorf("hcp-connector: user %s already has this policy %s", userId, policyId)
-	}
-
 	policies = append(policies, policyId)
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
