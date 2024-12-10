@@ -48,26 +48,10 @@ jobs:
           go-version: 1.22.x
       - name: Checkout code
         uses: actions/checkout@v4
+      - name: Run docker compose
+        run: docker compose -f ./docker-compose.yml up --detach
       - name: Build baton-hashicorp-vault
         run: go build ./cmd/baton-hashicorp-vault
-      - name: Run docker compose
-        run: docker compose up -d
-      - name: Run baton-hashicorp-vault
-      #   env:
-      #     BATON_VAULT_HOST: http://127.0.0.1:8200
-      #     BATON_VAULT_TOKEN: ${{ secrets.BATON_VAULT_TOKEN }}
-      #     BATON_DISABLE_HTTP_CACHE: true
-        run: ./baton-hashicorp-vault  --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
-      # - name: Import Secrets
-      #   id: import-secrets
-      #   uses: hashicorp/vault-action@v2.1.2
-      #   with:
-      #     url: http://localhost:8200
-      #     method: token
-      #     token: testtoken
-      #     secrets: |
-      #       secret/data/test-json-string jsonString;
-      #       secret/data/test-json-data jsonData;
       - name: Checkout baton
         uses: actions/checkout@v4
         with:
@@ -77,6 +61,17 @@ jobs:
       - name: Build baton
         working-directory: ./baton
         run: go build ./cmd/baton
+      - name: Wait for connector to finish starting up
+        uses: nick-fields/retry@v3
+        with:
+          timeout_seconds: 5
+          retry_wait_seconds: 10
+          max_attempts: 10
+          retry_on: error
+          command: |
+            curl -H "X-Vault-Token: testtoken" -f http://127.0.0.1:8200/v1/sys/auth
+      - name: Run baton-hashicorp-vault
+        run: ./baton-hashicorp-vault  --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
       # - name: Test grant/revoking policy
       #   env:
       #     BATON: ./baton/baton
