@@ -24,7 +24,7 @@ func (g *groupBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId
 		rv  []*v2.Resource
 	)
 
-	bag, _, err := getToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, groupResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}

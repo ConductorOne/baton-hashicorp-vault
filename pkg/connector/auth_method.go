@@ -24,7 +24,7 @@ func (a *authMethodBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 		rv  []*v2.Resource
 	)
 
-	bag, _, err := getToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, authMethodResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}

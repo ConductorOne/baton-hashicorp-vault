@@ -87,7 +87,7 @@ func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 		err error
 		rv  []*v2.Grant
 	)
-	bag, _, err := getToken(pToken, userResourceType)
+	bag, _, err := getToken(pToken, policyResourceType)
 	if err != nil {
 		return nil, "", nil, err
 	}
