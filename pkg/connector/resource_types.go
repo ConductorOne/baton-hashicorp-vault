@@ -26,21 +26,18 @@ var (
 		Id:          "policy",
 		DisplayName: "Policy",
 		Description: "Policy of Hashicorp Vault",
-		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
 
 	secretResourceType = &v2.ResourceType{
 		Id:          "secret",
 		DisplayName: "Secret",
 		Description: "Secret of Hashicorp Vault",
-		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
 
 	authMethodResourceType = &v2.ResourceType{
 		Id:          "auth_method",
 		DisplayName: "Authentication Method",
 		Description: "Authentication Methods of Hashicorp Vault",
-		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
 
 	groupResourceType = &v2.ResourceType{
@@ -54,6 +51,5 @@ var (
 		Id:          "entity",
 		DisplayName: "Entity",
 		Description: "Entity of Hashicorp Vault",
-		Traits:      []v2.ResourceType_Trait{v2.ResourceType_TRAIT_APP},
 	}
 )
