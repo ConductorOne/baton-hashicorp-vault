@@ -19,6 +19,7 @@ const (
 	UsersEndpoint       = "v1/auth/userpass/users"
 	RolesEndpoint       = "v1/auth/approle/role"
 	KvEndpoint          = "v1/kv"
+	SecEndpoint         = "v1/secret/metadata"
 	AuthMethodsEndpoint = "v1/sys/auth"
 	GroupsEndpoint      = "v1/identity/group/id"
 	EntityEndpoint      = "v1/identity/entity/id"
@@ -149,19 +150,24 @@ func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, e
 	return users, "", nil
 }
 
-func (h *HCPClient) ListAllSecrets(ctx context.Context) (*CommonAPIData, string, error) {
-	secrets, err := h.GetSecrets(ctx)
+func (h *HCPClient) ListAllSecrets(ctx context.Context, endpointUrl string) (*CommonAPIData, string, error) {
+	var pageToken = "1"
+	secrets, err := h.GetSecrets(ctx, endpointUrl)
 	if err != nil {
 		return nil, "", err
 	}
 
-	return secrets, "", nil
+	if endpointUrl == SecEndpoint {
+		return secrets, "", nil
+	}
+
+	return secrets, pageToken, nil
 }
 
 // GetSecrets. List All Secrets.
 // https://developer.hashicorp.com/vault/docs/secrets/kv/kv-v1#ttls
-func (h *HCPClient) GetSecrets(ctx context.Context) (*CommonAPIData, error) {
-	secretsUrl, err := url.JoinPath(h.baseUrl, KvEndpoint)
+func (h *HCPClient) GetSecrets(ctx context.Context, secretEndpoint string) (*CommonAPIData, error) {
+	secretsUrl, err := url.JoinPath(h.baseUrl, secretEndpoint)
 	if err != nil {
 		return nil, err
 	}
