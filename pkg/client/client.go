@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
@@ -32,6 +33,8 @@ const (
 	userpassType        = "userpass"
 	kvType              = "kv"
 )
+
+var listEndpoints = []string{KvEndpoint, SecEndpoint}
 
 type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
@@ -150,18 +153,28 @@ func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, e
 	return users, "", nil
 }
 
-func (h *HCPClient) ListAllSecrets(ctx context.Context, endpointUrl string) (*CommonAPIData, string, error) {
-	var pageToken = "1"
-	secrets, err := h.GetSecrets(ctx, endpointUrl)
+func (h *HCPClient) ListAllSecrets(ctx context.Context, token string) (*CommonAPIData, string, error) {
+	var (
+		pageToken = 0
+		err       error
+	)
+	if token != "" {
+		pageToken, err = strconv.Atoi(token)
+		if err != nil {
+			return nil, "", err
+		}
+	}
+
+	secrets, err := h.GetSecrets(ctx, listEndpoints[pageToken])
 	if err != nil {
 		return nil, "", err
 	}
 
-	if endpointUrl == SecEndpoint {
+	if pageToken == (len(listEndpoints) - 1) {
 		return secrets, "", nil
 	}
 
-	return secrets, pageToken, nil
+	return secrets, strconv.Itoa(pageToken + 1), nil
 }
 
 // GetSecrets. List All Secrets.

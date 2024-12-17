@@ -20,9 +20,8 @@ func (s *secretBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 
 func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
 	var (
-		err         error
-		rv          []*v2.Resource
-		endpointUrl = client.KvEndpoint
+		err error
+		rv  []*v2.Resource
 	)
 
 	bag, _, err := getToken(pToken, secretResourceType)
@@ -30,11 +29,7 @@ func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		return nil, "", nil, err
 	}
 
-	if bag.Current().Token != "" {
-		endpointUrl = client.SecEndpoint
-	}
-
-	secrets, nextPageToken, err := s.client.ListAllSecrets(ctx, endpointUrl)
+	secrets, nextPageToken, err := s.client.ListAllSecrets(ctx, bag.Current().Token)
 	if err != nil {
 		return nil, "", nil, err
 	}

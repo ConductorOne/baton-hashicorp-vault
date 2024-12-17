@@ -1596,7 +1596,7 @@ var (
 		"zenith",
 	}
 
-	LASTNAMES = []string{
+	NOUNS = []string{
 		"waterfall",
 		"river",
 		"breeze",
