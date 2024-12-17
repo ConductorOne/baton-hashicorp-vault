@@ -366,7 +366,7 @@ func TestAddSecrets(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			name := strings.ReplaceAll(mockdata.NAMES[i], " ", "")
-			value := strings.ReplaceAll(mockdata.LASTNAMES[i], " ", "")
+			value := strings.ReplaceAll(mockdata.NOUNS[i], " ", "")
 			err := cli.AddSecrets(context.Background(), name, value)
 			require.Nil(t, err)
 			wg.Done()
