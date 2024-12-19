@@ -27,7 +27,7 @@ var (
 func getClientForTesting(ctx context.Context, host string) (*client.HCPClient, error) {
 	hcpClient := client.NewClient()
 	hcpClient.WithBearerToken(vaultToken)
-	_, err := hcpClient.WithAddress(host)
+	err := hcpClient.WithAddress(host)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +307,7 @@ func TestAddUsers(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			name := strings.ReplaceAll(mockdata.FULLNAMES[i], " ", "")
-			err := cli.AddUsers(context.Background(), name)
+			err := cli.AddUsers(context.Background(), name, "superSecretPassword")
 			require.Nil(t, err)
 			wg.Done()
 			done <- true
