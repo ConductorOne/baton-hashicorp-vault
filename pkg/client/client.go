@@ -56,18 +56,17 @@ func NewClient() *HCPClient {
 	}
 }
 
-func (h *HCPClient) WithBearerToken(apiToken string) *HCPClient {
+func (h *HCPClient) WithBearerToken(apiToken string) {
 	h.auth.bearerToken = apiToken
-	return h
 }
 
-func (h *HCPClient) WithAddress(host string) (*HCPClient, error) {
+func (h *HCPClient) WithAddress(host string) error {
 	if !isValidUrl(host) {
-		return h, fmt.Errorf("host is not valid")
+		return fmt.Errorf("host is not valid")
 	}
 
 	h.baseUrl = host
-	return h, nil
+	return nil
 }
 
 func (h *HCPClient) getToken() string {
@@ -396,7 +395,7 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body an
 	return nil
 }
 
-func (h *HCPClient) AddUsers(ctx context.Context, name string) error {
+func (h *HCPClient) AddUsers(ctx context.Context, name, pwd string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
 		return err
@@ -404,7 +403,7 @@ func (h *HCPClient) AddUsers(ctx context.Context, name string) error {
 
 	var res any
 	if err = h.doRequest(ctx, http.MethodPost, endpointUrl, &res, bodyUsers{
-		Password:        "superSecretPassword",
+		Password:        pwd,
 		TokenPolicies:   []string{"admin", "default"},
 		TokenBoundCidrs: []string{"127.0.0.1/32", "128.252.0.0/16"},
 	}); err != nil {

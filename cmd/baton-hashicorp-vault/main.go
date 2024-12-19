@@ -48,15 +48,16 @@ func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer,
 		host      = cfg.GetString(VaultHostField.GetName())
 	)
 	l := ctxzap.Extract(ctx)
-	_, err := hcpClient.WithAddress(host)
+	err := hcpClient.WithAddress(host)
 	if err != nil {
 		return nil, err
 	}
 
+	hcpClient.WithBearerToken(token)
 	cb, err := connector.New(ctx,
 		token,
 		host,
-		hcpClient.WithBearerToken(token),
+		hcpClient,
 	)
 	if err != nil {
 		l.Error("error creating connector", zap.Error(err))
