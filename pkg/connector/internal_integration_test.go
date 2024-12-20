@@ -19,8 +19,8 @@ import (
 )
 
 var (
-	vaultHost  = os.Getenv("BATON_X_VAULT_HOST")
-	vaultToken = os.Getenv("BATON_X_VAULT_TOKEN")
+	vaultHost  = os.Getenv("BATON_VAULT_HOST")
+	vaultToken = os.Getenv("BATON_VAULT_TOKEN")
 	ctxTest    = context.Background()
 )
 
@@ -159,7 +159,7 @@ func TestGroupsBuilderList(t *testing.T) {
 	require.Nil(t, err)
 
 	g := &groupBuilder{
-		resourceType: authMethodResourceType,
+		resourceType: groupResourceType,
 		client:       cliTest,
 	}
 	var token = "{}"
@@ -181,7 +181,7 @@ func TestEntitiesBuilderList(t *testing.T) {
 	require.Nil(t, err)
 
 	e := &entityBuilder{
-		resourceType: authMethodResourceType,
+		resourceType: entityResourceType,
 		client:       cliTest,
 	}
 
