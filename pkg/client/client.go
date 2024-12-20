@@ -182,11 +182,10 @@ func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod st
 		return false, err
 	}
 
-	var res any
 	err = h.getAPIData(ctx,
 		http.MethodGet,
 		uri,
-		&res,
+		nil,
 	)
 	if err != nil {
 		return true, err
