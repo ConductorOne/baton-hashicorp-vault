@@ -41,8 +41,8 @@ func (a *authMethodBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 
 	for method := range authMethods.Data {
 		ur, err := authMethodResource(ctx, &client.APIResource{
-			ID:   method,
-			Name: method,
+			ID:   removeTrailingSlash(method),
+			Name: removeTrailingSlash(method),
 		}, nil)
 		if err != nil {
 			return nil, "", nil, err

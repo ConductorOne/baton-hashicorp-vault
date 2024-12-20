@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"regexp"
 	"strconv"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -220,4 +221,9 @@ func entityResource(ctx context.Context, entity *client.APIResource, parentResou
 	}
 
 	return resource, nil
+}
+
+func removeTrailingSlash(strPath string) string {
+	regex := regexp.MustCompile(`/`)
+	return regex.ReplaceAllString(strPath, "")
 }
