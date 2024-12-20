@@ -32,6 +32,7 @@ const (
 	approleType         = "approle"
 	userpassType        = "userpass"
 	kvType              = "kv"
+	StatusBadRequest    = "400 Bad Request"
 )
 
 var listEndpoints = []string{KvEndpoint, SecEndpoint}
@@ -119,28 +120,79 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 }
 
 func enableStores(ctx context.Context, hcpClient *HCPClient) error {
-	err := hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
-		Type: approleType,
-	})
+	isAuthError, err := hcpClient.CheckAuthenticationMethod(ctx, ApproleAuthEndpoint)
 	if err != nil {
-		return err
+		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
+			err = hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
+				Type: approleType,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if !isAuthError {
+			return err
+		}
 	}
 
-	err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
-		Type: userpassType,
-	})
+	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, UserAuthEndpoint)
 	if err != nil {
-		return err
+		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
+			err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
+				Type: userpassType,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if !isAuthError {
+			return err
+		}
 	}
 
-	err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
-		Type: kvType,
-	})
+	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, KvAuthEndpoint)
 	if err != nil {
-		return err
+		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
+			err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
+				Type: kvType,
+			})
+			if err != nil {
+				return err
+			}
+		}
+
+		if !isAuthError {
+			return err
+		}
 	}
 
 	return nil
+}
+
+func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) (bool, error) {
+	authUrl, err := url.JoinPath(h.baseUrl, authMethod)
+	if err != nil {
+		return false, err
+	}
+
+	uri, err := url.Parse(authUrl)
+	if err != nil {
+		return false, err
+	}
+
+	var res any
+	err = h.getAPIData(ctx,
+		http.MethodGet,
+		uri,
+		&res,
+	)
+	if err != nil {
+		return true, err
+	}
+
+	return false, nil
 }
 
 func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {
