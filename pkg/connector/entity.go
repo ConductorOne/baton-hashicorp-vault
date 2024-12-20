@@ -69,7 +69,7 @@ func (e *entityBuilder) Grants(ctx context.Context, resource *v2.Resource, pToke
 
 func newEntityBuilder(c *client.HCPClient) *entityBuilder {
 	return &entityBuilder{
-		resourceType: userResourceType,
+		resourceType: entityResourceType,
 		client:       c,
 	}
 }
