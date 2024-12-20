@@ -46,7 +46,7 @@ Run the docker-compose file included in the connector for local testing.
 
 By using docker compose, you can run the following command to sync resources.
 ```
- baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken
+ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
 ```
 
 # Data Model
