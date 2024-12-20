@@ -1,6 +1,6 @@
 ![Baton Logo](./docs/images/baton-logo.png)
 
-# `baton-freshservice` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-freshservice.svg)](https://pkg.go.dev/github.com/conductorone/baton-freshservice) ![main ci](https://github.com/conductorone/baton-freshservice/actions/workflows/main.yaml/badge.svg)
+# `baton-hashicorp-vault` [![Go Reference](https://pkg.go.dev/badge/github.com/conductorone/baton-hashicorp-vault.svg)](https://pkg.go.dev/github.com/conductorone/baton-hashicorp-vault) ![main ci](https://github.com/conductorone/baton-hashicorp-vault/actions/workflows/main.yaml/badge.svg)
 
 `baton-hashicorp-vault` is a connector for built using the [Baton SDK](https://github.com/conductorone/baton-sdk).
 
@@ -92,9 +92,9 @@ Flags:
   -p, --provisioning           This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
       --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
       --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
+      --vault-host string      required: Vault address or Host. Ex. http://127.0.0.1:8200 ($BATON_VAULT_HOST)
+      --vault-token string     required: Vault Token ($BATON_VAULT_TOKEN)
   -v, --version                version for baton-hashicorp-vault
-      --x-vault-host string    required: Vault Host ($BATON_X_VAULT_HOST)
-      --x-vault-token string   required: Vault Token ($BATON_X_VAULT_TOKEN)
 
 Use "baton-hashicorp-vault [command] --help" for more information about a command.
 ```
