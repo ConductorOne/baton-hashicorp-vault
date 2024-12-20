@@ -26,7 +26,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> -e BATON_USERNAME=username ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
