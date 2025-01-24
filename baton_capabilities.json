@@ -3,6 +3,86 @@
   "resourceTypeCapabilities":  [
     {
       "resourceType":  {
+        "id":  "auth_method",
+        "displayName":  "Authentication Method",
+        "traits":  [
+          "TRAIT_APP"
+        ],
+        "description":  "Authentication Methods of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "entity",
+        "displayName":  "Entity",
+        "traits":  [
+          "TRAIT_APP"
+        ],
+        "description":  "Entity of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "group",
+        "displayName":  "Group",
+        "traits":  [
+          "TRAIT_GROUP"
+        ],
+        "description":  "Group of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "policy",
+        "displayName":  "Policy",
+        "traits":  [
+          "TRAIT_APP"
+        ],
+        "description":  "Policy of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC",
+        "CAPABILITY_PROVISION"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "role",
+        "displayName":  "Role",
+        "traits":  [
+          "TRAIT_ROLE"
+        ],
+        "description":  "Roles of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC",
+        "CAPABILITY_PROVISION"
+      ]
+    },
+    {
+      "resourceType":  {
+        "id":  "secret",
+        "displayName":  "Secret",
+        "traits":  [
+          "TRAIT_APP"
+        ],
+        "description":  "Secret of Hashicorp Vault"
+      },
+      "capabilities":  [
+        "CAPABILITY_SYNC"
+      ]
+    },
+    {
+      "resourceType":  {
         "id":  "user",
         "displayName":  "User",
         "traits":  [
@@ -15,6 +95,7 @@
     }
   ],
   "connectorCapabilities":  [
-    "CAPABILITY_SYNC"
+    "CAPABILITY_SYNC",
+    "CAPABILITY_PROVISION"
   ]
 }

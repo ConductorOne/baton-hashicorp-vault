@@ -8,6 +8,13 @@ Check out [Baton](https://github.com/conductorone/baton) to learn more the proje
 
 # Getting Started
 
+HashiCorp Vault is a tool that allows you to safely manage secrets. By secrets, we mean sensitive information like digital certificates, database credentials, passwords, and API encryption keys. Go to [https://portal.cloud.hashicorp.com/sign-up](https://portal.cloud.hashicorp.com/sign-up). Create an account and Sign in. 
+
+## Prerequisites
+
+Host and token for your HashiCorp account. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser. 
+Check out their [documentation](https://developer.hashicorp.com/vault/install) for more tips on getting started.
+
 ## brew
 
 ```
@@ -19,7 +26,7 @@ baton resources
 ## docker
 
 ```
-docker run --rm -v $(pwd):/out -e BATON_DOMAIN_URL=domain_url -e BATON_API_KEY=apiKey -e BATON_USERNAME=username ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
@@ -33,11 +40,24 @@ baton-hashicorp-vault
 
 baton resources
 ```
+## Running locally
+
+Run the docker-compose file included in the connector for local testing.
+
+By using docker compose, you can run the following command to sync resources.
+```
+ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
+```
 
 # Data Model
 
 `baton-hashicorp-vault` will pull down information about the following resources:
 - Users
+- Groups
+- Roles
+- Entities
+- Policies
+- Secrets
 
 # Contributing, Support and Issues
 
@@ -63,15 +83,18 @@ Available Commands:
   help               Help about any command
 
 Flags:
-      --client-id string             The client ID used to authenticate with ConductorOne ($BATON_CLIENT_ID)
-      --client-secret string         The client secret used to authenticate with ConductorOne ($BATON_CLIENT_SECRET)
-  -f, --file string                  The path to the c1z file to sync with ($BATON_FILE) (default "sync.c1z")
-  -h, --help                         help for baton-hashicorp-vault
-      --log-format string            The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
-      --log-level string             The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
-  -p, --provisioning                 If this connector supports provisioning, this must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
-      --ticketing                    This must be set to enable ticketing support ($BATON_TICKETING)
-  -v, --version                      version for baton-hashicorp-vault
+      --client-id string       The client ID used to authenticate with ConductorOne ($BATON_CLIENT_ID)
+      --client-secret string   The client secret used to authenticate with ConductorOne ($BATON_CLIENT_SECRET)
+  -f, --file string            The path to the c1z file to sync with ($BATON_FILE) (default "sync.c1z")
+  -h, --help                   help for baton-hashicorp-vault
+      --log-format string      The output format for logs: json, console ($BATON_LOG_FORMAT) (default "json")
+      --log-level string       The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
+  -p, --provisioning           This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
+      --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
+      --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
+      --vault-host string      required: Vault address or Host. Ex. http://127.0.0.1:8200 ($BATON_VAULT_HOST)
+      --vault-token string     required: Vault Token ($BATON_VAULT_TOKEN)
+  -v, --version                version for baton-hashicorp-vault
 
 Use "baton-hashicorp-vault [command] --help" for more information about a command.
 ```
