@@ -10,6 +10,7 @@ import (
 	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	configSchema "github.com/conductorone/baton-sdk/pkg/config"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/connectorrunner"
 	"github.com/conductorone/baton-sdk/pkg/types"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -24,6 +25,7 @@ func main() {
 		"baton-hashicorp-vault",
 		getConnector,
 		config.Configuration,
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilder(&connector.Connector{}),
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
