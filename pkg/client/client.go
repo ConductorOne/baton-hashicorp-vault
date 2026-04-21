@@ -25,9 +25,10 @@ const (
 	GroupsEndpoint      = "v1/identity/group/id"
 	EntityEndpoint      = "v1/identity/entity/id"
 	policiesEndpoint    = "v1/sys/policy"
-	ApproleAuthEndpoint = "v1/sys/auth/approle"
-	UserAuthEndpoint    = "v1/sys/auth/userpass"
-	KvAuthEndpoint      = "v1/sys/mounts/kv"
+	ApproleAuthEndpoint  = "v1/sys/auth/approle"
+	UserAuthEndpoint     = "v1/sys/auth/userpass"
+	KvAuthEndpoint       = "v1/sys/mounts/kv"
+	AppRoleLoginEndpoint = "v1/auth/approle/login"
 	MethodList          = "LIST"
 	approleType         = "approle"
 	userpassType        = "userpass"
@@ -59,6 +60,57 @@ func NewClient() *HCPClient {
 
 func (h *HCPClient) WithBearerToken(apiToken string) {
 	h.auth.bearerToken = apiToken
+}
+
+func (h *HCPClient) WithAppRole(roleID, secretID string) {
+	h.auth.roleID = roleID
+	h.auth.secretID = secretID
+}
+
+func (h *HCPClient) IsConfigured() bool {
+	return h.auth.bearerToken != "" || (h.auth.roleID != "" && h.auth.secretID != "")
+}
+
+func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
+	loginURL, err := url.JoinPath(h.baseUrl, AppRoleLoginEndpoint)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to build approle login URL: %w", err)
+	}
+
+	uri, err := url.Parse(loginURL)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse approle login URL: %w", err)
+	}
+
+	req, err := h.httpClient.NewRequest(ctx,
+		http.MethodPost,
+		uri,
+		uhttp.WithJSONBody(appRoleLoginRequest{
+			RoleID:   h.auth.roleID,
+			SecretID: h.auth.secretID,
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to create approle login request: %w", err)
+	}
+
+	var res appRoleLoginResponse
+	resp, err := h.httpClient.Do(req, uhttp.WithResponse(&res))
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+	if err != nil {
+		// Do not wrap err directly: SDK error messages can embed the response body,
+		// which on a successful login contains the client_token.
+		return fmt.Errorf("baton-hashicorp-vault: approle login failed (see debug logs for details)")
+	}
+
+	if res.Auth.ClientToken == "" {
+		return fmt.Errorf("baton-hashicorp-vault: approle login returned empty token")
+	}
+
+	h.auth.bearerToken = res.Auth.ClientToken
+	return nil
 }
 
 func (h *HCPClient) WithAddress(host string) error {
@@ -102,13 +154,20 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 		return nil, fmt.Errorf("the url : %s is not valid", baseUrl)
 	}
 
-	// bearerToken
 	hcp := HCPClient{
 		httpClient: cli,
 		baseUrl:    baseUrl,
 		auth: &auth{
 			bearerToken: clientToken,
+			roleID:      hcpClient.auth.roleID,
+			secretID:    hcpClient.auth.secretID,
 		},
+	}
+
+	if hcp.auth.roleID != "" && hcp.auth.secretID != "" {
+		if err := hcp.AppRoleLogin(ctx); err != nil {
+			return nil, err
+		}
 	}
 
 	err = enableStores(ctx, &hcp)
@@ -409,14 +468,18 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		}
 	}
 
-	if resp != nil && (resp.StatusCode == http.StatusNotFound ||
-		resp.StatusCode == http.StatusBadRequest) {
+	// 404 means the path/engine doesn't exist — treat as empty result.
+	if resp != nil && resp.StatusCode == http.StatusNotFound {
+		return nil
+	}
+
+	if resp != nil && resp.StatusCode == http.StatusBadRequest {
 		cErr, err := getError(resp)
 		if err != nil {
 			return err
 		}
 
-		// There is no data ot It's already authorized
+		// It's already authorized / path already in use
 		if len(cErr.Errors) == 0 || strings.Contains(cErr.Errors[0], "path is already in use") {
 			return nil
 		}

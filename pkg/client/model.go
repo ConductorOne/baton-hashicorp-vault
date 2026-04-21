@@ -2,6 +2,21 @@ package client
 
 type auth struct {
 	bearerToken string
+	roleID      string
+	secretID    string
+}
+
+type appRoleLoginRequest struct {
+	RoleID   string `json:"role_id"`
+	SecretID string `json:"secret_id"`
+}
+
+type appRoleLoginResponse struct {
+	Auth appRoleAuth `json:"auth"`
+}
+
+type appRoleAuth struct {
+	ClientToken string `json:"client_token"`
 }
 
 type CommonAPIData struct {
