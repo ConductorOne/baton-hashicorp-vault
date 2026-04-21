@@ -15,25 +15,25 @@ import (
 )
 
 const (
-	AuthHeaderName      = "X-Vault-Token"
-	DefaultAddress      = "http://127.0.0.1:8200"
-	UsersEndpoint       = "v1/auth/userpass/users"
-	RolesEndpoint       = "v1/auth/approle/role"
-	KvEndpoint          = "v1/kv"
-	SecEndpoint         = "v1/secret/metadata"
-	AuthMethodsEndpoint = "v1/sys/auth"
-	GroupsEndpoint      = "v1/identity/group/id"
-	EntityEndpoint      = "v1/identity/entity/id"
-	policiesEndpoint    = "v1/sys/policy"
+	AuthHeaderName       = "X-Vault-Token"
+	DefaultAddress       = "http://127.0.0.1:8200"
+	UsersEndpoint        = "v1/auth/userpass/users"
+	RolesEndpoint        = "v1/auth/approle/role"
+	KvEndpoint           = "v1/kv"
+	SecEndpoint          = "v1/secret/metadata"
+	AuthMethodsEndpoint  = "v1/sys/auth"
+	GroupsEndpoint       = "v1/identity/group/id"
+	EntityEndpoint       = "v1/identity/entity/id"
+	policiesEndpoint     = "v1/sys/policy"
 	ApproleAuthEndpoint  = "v1/sys/auth/approle"
 	UserAuthEndpoint     = "v1/sys/auth/userpass"
 	KvAuthEndpoint       = "v1/sys/mounts/kv"
 	AppRoleLoginEndpoint = "v1/auth/approle/login"
-	MethodList          = "LIST"
-	approleType         = "approle"
-	userpassType        = "userpass"
-	kvType              = "kv"
-	StatusBadRequest    = "400 Bad Request"
+	MethodList           = "LIST"
+	approleType          = "approle"
+	userpassType         = "userpass"
+	kvType               = "kv"
+	StatusBadRequest     = "400 Bad Request"
 )
 
 var listEndpoints = []string{KvEndpoint, SecEndpoint}
@@ -479,7 +479,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 			return err
 		}
 
-		// It's already authorized / path already in use
+		// It's already authorized / path already in use.
 		if len(cErr.Errors) == 0 || strings.Contains(cErr.Errors[0], "path is already in use") {
 			return nil
 		}
