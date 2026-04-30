@@ -360,7 +360,7 @@ func (h *HCPClient) ListAllRoles(ctx context.Context) (*CommonAPIData, string, e
 	return roles, "", nil
 }
 
-// GetUsers. List All Users.
+// GetRoles List All Roles.
 // https://developer.hashicorp.com/vault/api-docs/auth/approle#list-roles
 func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 	rolesUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint)
