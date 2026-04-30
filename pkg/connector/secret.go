@@ -39,14 +39,6 @@ func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		return nil, "", nil, err
 	}
 
-	if secrets == nil {
-		nextPageToken, err = bag.Marshal()
-		if err != nil {
-			return nil, "", nil, err
-		}
-		return rv, nextPageToken, nil, nil
-	}
-
 	for _, secret := range secrets.Data.Keys {
 		ur, err := secretResource(ctx, &client.APIResource{
 			ID:        secret,

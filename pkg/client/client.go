@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,12 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 )
+
+// ErrNotFound is returned when Vault responds with 404. For LIST operations
+// this means the path is mounted but has no entries; callers that expect a
+// collection should convert it to an empty result. All other callers should
+// treat it as a real error.
+var ErrNotFound = errors.New("baton-hashicorp-vault: resource not found")
 
 const (
 	AuthHeaderName       = "X-Vault-Token"
@@ -100,9 +107,7 @@ func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
 		defer resp.Body.Close()
 	}
 	if err != nil {
-		// Do not wrap err directly: SDK error messages can embed the response body,
-		// which on a successful login contains the client_token.
-		return fmt.Errorf("baton-hashicorp-vault: approle login failed (see debug logs for details)")
+		return fmt.Errorf("baton-hashicorp-vault: approle login failed: %w", err)
 	}
 
 	if res.Auth.ClientToken == "" {
@@ -115,7 +120,7 @@ func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
 
 func (h *HCPClient) WithAddress(host string) error {
 	if !isValidUrl(host) {
-		return fmt.Errorf("host is not valid")
+		return fmt.Errorf("baton-hashicorp-vault: host %q is not valid", host)
 	}
 
 	h.baseUrl = host
@@ -138,12 +143,12 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	)
 	httpClient, err := uhttp.NewClient(ctx, uhttp.WithLogger(true, ctxzap.Extract(ctx)))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to create HTTP client: %w", err)
 	}
 
 	cli, err := uhttp.NewBaseHttpClientWithContext(context.Background(), httpClient)
 	if err != nil {
-		return hcpClient, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to initialize HTTP client: %w", err)
 	}
 
 	if hcpClient.baseUrl != "" {
@@ -151,7 +156,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	if !isValidUrl(baseUrl) {
-		return nil, fmt.Errorf("the url : %s is not valid", baseUrl)
+		return nil, fmt.Errorf("baton-hashicorp-vault: vault address %q is not valid", baseUrl)
 	}
 
 	hcp := HCPClient{
@@ -233,12 +238,12 @@ func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) (bool, error) {
 	authUrl, err := url.JoinPath(h.baseUrl, authMethod)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("baton-hashicorp-vault: failed to build URL for auth method %q: %w", authMethod, err)
 	}
 
 	uri, err := url.Parse(authUrl)
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
 	}
 
 	err = h.getAPIData(ctx,
@@ -270,7 +275,7 @@ func (h *HCPClient) ListAllSecrets(ctx context.Context, token string) (*CommonAP
 	if token != "" {
 		pageToken, err = strconv.Atoi(token)
 		if err != nil {
-			return nil, "", err
+			return nil, "", fmt.Errorf("baton-hashicorp-vault: invalid pagination token %q: %w", token, err)
 		}
 	}
 
@@ -291,12 +296,12 @@ func (h *HCPClient) ListAllSecrets(ctx context.Context, token string) (*CommonAP
 func (h *HCPClient) GetSecrets(ctx context.Context, secretEndpoint string) (*CommonAPIData, error) {
 	secretsUrl, err := url.JoinPath(h.baseUrl, secretEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build secrets URL: %w", err)
 	}
 
 	uri, err := url.Parse(secretsUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to parse secrets URL: %w", err)
 	}
 
 	var res *CommonAPIData
@@ -306,6 +311,10 @@ func (h *HCPClient) GetSecrets(ctx context.Context, secretEndpoint string) (*Com
 		&res,
 	)
 	if err != nil {
+		// Vault returns 404 on LIST when the engine is mounted but has no entries.
+		if errors.Is(err, ErrNotFound) {
+			return &CommonAPIData{}, nil
+		}
 		return nil, err
 	}
 
@@ -317,12 +326,12 @@ func (h *HCPClient) GetSecrets(ctx context.Context, secretEndpoint string) (*Com
 func (h *HCPClient) GetUsers(ctx context.Context) (*CommonAPIData, error) {
 	usersUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build users URL: %w", err)
 	}
 
 	uri, err := url.Parse(usersUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to parse users URL: %w", err)
 	}
 
 	var res *CommonAPIData
@@ -332,6 +341,10 @@ func (h *HCPClient) GetUsers(ctx context.Context) (*CommonAPIData, error) {
 		&res,
 	)
 	if err != nil {
+		// Vault returns 404 on LIST when the engine is mounted but has no entries.
+		if errors.Is(err, ErrNotFound) {
+			return &CommonAPIData{}, nil
+		}
 		return nil, err
 	}
 
@@ -352,12 +365,12 @@ func (h *HCPClient) ListAllRoles(ctx context.Context) (*CommonAPIData, string, e
 func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 	rolesUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build roles URL: %w", err)
 	}
 
 	uri, err := url.Parse(rolesUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to parse roles URL: %w", err)
 	}
 
 	var res *CommonAPIData
@@ -367,6 +380,10 @@ func (h *HCPClient) GetRoles(ctx context.Context) (*CommonAPIData, error) {
 		&res,
 	)
 	if err != nil {
+		// Vault returns 404 on LIST when the engine is mounted but has no entries.
+		if errors.Is(err, ErrNotFound) {
+			return &CommonAPIData{}, nil
+		}
 		return nil, err
 	}
 
@@ -387,12 +404,12 @@ func (h *HCPClient) ListAllPolicies(ctx context.Context) (*PolicyAPIData, string
 func (h *HCPClient) GetPolicies(ctx context.Context) (*PolicyAPIData, error) {
 	policiesUrl, err := url.JoinPath(h.baseUrl, policiesEndpoint)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build policies URL: %w", err)
 	}
 
 	uri, err := url.Parse(policiesUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to parse policies URL: %w", err)
 	}
 
 	var res *PolicyAPIData
@@ -423,13 +440,13 @@ func (h *HCPClient) getAPIData(ctx context.Context,
 func getError(resp *http.Response) (CustomErr, error) {
 	bytes, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return CustomErr{}, err
+		return CustomErr{}, fmt.Errorf("baton-hashicorp-vault: failed to read error response body: %w", err)
 	}
 
 	var cErr CustomErr
 	err = json.Unmarshal(bytes, &cErr)
 	if err != nil {
-		return cErr, err
+		return cErr, fmt.Errorf("baton-hashicorp-vault: failed to parse error response: %w", err)
 	}
 
 	return cErr, nil
@@ -442,7 +459,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	)
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse request URL %q: %w", endpointUrl, err)
 	}
 
 	req, err := h.httpClient.NewRequest(ctx,
@@ -452,7 +469,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		uhttp.WithJSONBody(body),
 	)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to create %s request for %s: %w", method, endpointUrl, err)
 	}
 
 	switch method {
@@ -468,9 +485,8 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		}
 	}
 
-	// 404 means the path/engine doesn't exist — treat as empty result.
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
-		return nil
+		return ErrNotFound
 	}
 
 	if resp != nil && resp.StatusCode == http.StatusBadRequest {
@@ -486,7 +502,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	}
 
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: %s %s failed: %w", method, endpointUrl, err)
 	}
 
 	return nil
@@ -498,7 +514,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body any) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, apiUrl)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for enable auth method %q: %w", apiUrl, err)
 	}
 
 	var res any
@@ -512,7 +528,7 @@ func (h *HCPClient) EnableAuthMethod(ctx context.Context, apiUrl string, body an
 func (h *HCPClient) AddUsers(ctx context.Context, name, pwd string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for add user %q: %w", name, err)
 	}
 
 	var res any
@@ -530,7 +546,7 @@ func (h *HCPClient) AddUsers(ctx context.Context, name, pwd string) error {
 func (h *HCPClient) AddRoles(ctx context.Context, name string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, RolesEndpoint, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for add role %q: %w", name, err)
 	}
 
 	var res any
@@ -551,7 +567,7 @@ func (h *HCPClient) AddRoles(ctx context.Context, name string) error {
 func (h *HCPClient) AddSecrets(ctx context.Context, name, value string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, KvEndpoint, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for add secret %q: %w", name, err)
 	}
 
 	var res any
@@ -567,12 +583,12 @@ func (h *HCPClient) AddSecrets(ctx context.Context, name, value string) error {
 func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, error) {
 	userUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build URL for user %q: %w", name, err)
 	}
 
 	uri, err := url.Parse(userUrl)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to parse URL for user %q: %w", name, err)
 	}
 
 	var res *UserAPIData
@@ -591,12 +607,12 @@ func (h *HCPClient) GetUser(ctx context.Context, name string) (*UserAPIData, err
 func (h *HCPClient) ListAllAuthenticationMethods(ctx context.Context) (*authMethodsAPIData, string, error) {
 	authUrl, err := url.JoinPath(h.baseUrl, AuthMethodsEndpoint)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to build auth methods URL: %w", err)
 	}
 
 	uri, err := url.Parse(authUrl)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to parse auth methods URL: %w", err)
 	}
 
 	var res *authMethodsAPIData
@@ -615,12 +631,12 @@ func (h *HCPClient) ListAllAuthenticationMethods(ctx context.Context) (*authMeth
 func (h *HCPClient) ListAllGroups(ctx context.Context) (*groupsAPIData, string, error) {
 	groupUrl, err := url.JoinPath(h.baseUrl, GroupsEndpoint)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to build groups URL: %w", err)
 	}
 
 	uri, err := url.Parse(groupUrl)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to parse groups URL: %w", err)
 	}
 
 	var res *groupsAPIData
@@ -630,6 +646,10 @@ func (h *HCPClient) ListAllGroups(ctx context.Context) (*groupsAPIData, string, 
 		&res,
 	)
 	if err != nil {
+		// Vault returns 404 on LIST when the engine is mounted but has no entries.
+		if errors.Is(err, ErrNotFound) {
+			return &groupsAPIData{}, "", nil
+		}
 		return nil, "", err
 	}
 
@@ -639,12 +659,12 @@ func (h *HCPClient) ListAllGroups(ctx context.Context) (*groupsAPIData, string, 
 func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string, error) {
 	entityUrl, err := url.JoinPath(h.baseUrl, EntityEndpoint)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to build entities URL: %w", err)
 	}
 
 	uri, err := url.Parse(entityUrl)
 	if err != nil {
-		return nil, "", err
+		return nil, "", fmt.Errorf("baton-hashicorp-vault: failed to parse entities URL: %w", err)
 	}
 
 	var res *entityAPIData
@@ -654,6 +674,10 @@ func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string
 		&res,
 	)
 	if err != nil {
+		// Vault returns 404 on LIST when the engine is mounted but has no entries.
+		if errors.Is(err, ErrNotFound) {
+			return &entityAPIData{}, "", nil
+		}
 		return nil, "", err
 	}
 
@@ -665,7 +689,7 @@ func (h *HCPClient) ListAllEntities(ctx context.Context) (*entityAPIData, string
 func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name string) error {
 	endpointUrl, err := url.JoinPath(h.baseUrl, UsersEndpoint, name)
 	if err != nil {
-		return err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for update user policy %q: %w", name, err)
 	}
 
 	var res any

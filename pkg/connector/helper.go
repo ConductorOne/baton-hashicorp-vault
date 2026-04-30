@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strconv"
 
@@ -134,14 +135,14 @@ func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error)
 	b := &pagination.Bag{}
 	err := b.Unmarshal(token.Token)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("baton-hashicorp-vault: failed to unmarshal pagination token: %w", err)
 	}
 	current := b.Current()
 	skip := int32(0)
 	if current != nil && current.Token != "" {
 		skip64, err := strconv.ParseInt(current.Token, 10, 32)
 		if err != nil {
-			return 0, nil, err
+			return 0, nil, fmt.Errorf("baton-hashicorp-vault: invalid skip token %q: %w", current.Token, err)
 		}
 		skip = int32(skip64)
 	}
@@ -168,7 +169,7 @@ func getToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*paginat
 	if bag.Current().Token != "" {
 		pageToken, err = strconv.Atoi(bag.Current().Token)
 		if err != nil {
-			return bag, 0, err
+			return bag, 0, fmt.Errorf("baton-hashicorp-vault: invalid page token %q: %w", bag.Current().Token, err)
 		}
 	}
 

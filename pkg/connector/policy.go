@@ -133,18 +133,18 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 	l := ctxzap.Extract(ctx)
 	if principal.Id.ResourceType != userResourceType.Id {
 		l.Warn(
-			"hcp-connector: only users can be granted policy membership",
+			"baton-hashicorp-vault: only users can be granted policy membership",
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),
 		)
-		return nil, fmt.Errorf("hcp-connector: only users can be granted policy membership")
+		return nil, fmt.Errorf("baton-hashicorp-vault: only users can be granted policy membership")
 	}
 
 	policyId := entitlement.Resource.Id.Resource
 	userId := principal.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy grant: %w", userId, err)
 	}
 
 	var policies = []string{}
@@ -158,7 +158,7 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to update policies for user %q: %w", userId, err)
 	}
 
 	return nil, nil
@@ -170,19 +170,19 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 	entitlement := grant.Entitlement
 	if principal.Id.ResourceType != userResourceType.Id {
 		l.Warn(
-			"hcp-connector: only users can have policy membership revoked",
+			"baton-hashicorp-vault: only users can have policy membership revoked",
 			zap.String("principal_id", principal.Id.String()),
 			zap.String("principal_type", principal.Id.ResourceType),
 		)
 
-		return nil, fmt.Errorf("hcp-connector: only users can have policy membership revoked")
+		return nil, fmt.Errorf("baton-hashicorp-vault: only users can have policy membership revoked")
 	}
 
 	userId := principal.Id.Resource
 	policyId := entitlement.Resource.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy revoke: %w", userId, err)
 	}
 
 	var policies = []string{}
@@ -196,7 +196,7 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to update policies for user %q: %w", userId, err)
 	}
 
 	return nil, nil
