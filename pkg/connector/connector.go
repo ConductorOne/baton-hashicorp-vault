@@ -48,9 +48,9 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 }
 
 // New returns a new instance of the connector.
-func New(ctx context.Context, token, host string, hcpClient *client.HCPClient) (*Connector, error) {
+func New(ctx context.Context, hcpClient *client.HCPClient) (*Connector, error) {
 	var err error
-	if token != "" && host != "" {
+	if hcpClient.IsConfigured() {
 		hcpClient, err = client.New(ctx, hcpClient)
 		if err != nil {
 			return nil, err
