@@ -149,7 +149,7 @@ func unmarshalSkipToken(token *pagination.Token) (int32, *pagination.Bag, error)
 	return skip, b, nil
 }
 
-func RemoveIndex(s []string, index int) []string {
+func removeIndex(s []string, index int) []string {
 	return append(s[:index], s[index+1:]...)
 }
 

@@ -193,7 +193,7 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 		return c == policyId
 	})
 	if posPolicy != NF {
-		policies = RemoveIndex(policies, posPolicy)
+		policies = removeIndex(policies, posPolicy)
 	}
 
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)

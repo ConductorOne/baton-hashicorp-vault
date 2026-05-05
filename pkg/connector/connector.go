@@ -49,22 +49,6 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 	return nil, nil
 }
 
-/*
-func New(ctx context.Context, hcpClient *client.HCPClient) (*Connector, error) {
-	var err error
-	if hcpClient.IsConfigured() {
-		hcpClient, err = client.New(ctx, hcpClient)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return &Connector{
-		client: hcpClient,
-	}, nil
-}
-*/
-
 // New returns a new instance of the connector.
 func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
 	hcpClient := client.NewClient()
