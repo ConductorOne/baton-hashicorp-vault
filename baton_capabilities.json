@@ -1,101 +1,90 @@
 {
-  "@type":  "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
-  "resourceTypeCapabilities":  [
+  "@type": "type.googleapis.com/c1.connector.v2.ConnectorCapabilities",
+  "resourceTypeCapabilities": [
     {
-      "resourceType":  {
-        "id":  "auth_method",
-        "displayName":  "Authentication Method",
-        "traits":  [
-          "TRAIT_APP"
-        ],
-        "description":  "Authentication Methods of Hashicorp Vault"
+      "resourceType": {
+        "id": "auth_method",
+        "displayName": "Authentication Method",
+        "description": "Authentication Methods of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "entity",
-        "displayName":  "Entity",
-        "traits":  [
-          "TRAIT_APP"
-        ],
-        "description":  "Entity of Hashicorp Vault"
+      "resourceType": {
+        "id": "entity",
+        "displayName": "Entity",
+        "description": "Entity of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "group",
-        "displayName":  "Group",
-        "traits":  [
+      "resourceType": {
+        "id": "group",
+        "displayName": "Group",
+        "traits": [
           "TRAIT_GROUP"
         ],
-        "description":  "Group of Hashicorp Vault"
+        "description": "Group of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "policy",
-        "displayName":  "Policy",
-        "traits":  [
-          "TRAIT_APP"
-        ],
-        "description":  "Policy of Hashicorp Vault"
+      "resourceType": {
+        "id": "policy",
+        "displayName": "Policy",
+        "description": "Policy of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "role",
-        "displayName":  "Role",
-        "traits":  [
+      "resourceType": {
+        "id": "role",
+        "displayName": "Role",
+        "traits": [
           "TRAIT_ROLE"
         ],
-        "description":  "Roles of Hashicorp Vault"
+        "description": "Roles of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC",
         "CAPABILITY_PROVISION"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "secret",
-        "displayName":  "Secret",
-        "traits":  [
-          "TRAIT_APP"
-        ],
-        "description":  "Secret of Hashicorp Vault"
+      "resourceType": {
+        "id": "secret",
+        "displayName": "Secret",
+        "description": "Secret of Hashicorp Vault"
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC"
       ]
     },
     {
-      "resourceType":  {
-        "id":  "user",
-        "displayName":  "User",
-        "traits":  [
+      "resourceType": {
+        "id": "user",
+        "displayName": "User",
+        "traits": [
           "TRAIT_USER"
         ]
       },
-      "capabilities":  [
+      "capabilities": [
         "CAPABILITY_SYNC"
       ]
     }
   ],
-  "connectorCapabilities":  [
-    "CAPABILITY_SYNC",
-    "CAPABILITY_PROVISION"
-  ]
+  "connectorCapabilities": [
+    "CAPABILITY_PROVISION",
+    "CAPABILITY_SYNC"
+  ],
+  "credentialDetails": {}
 }

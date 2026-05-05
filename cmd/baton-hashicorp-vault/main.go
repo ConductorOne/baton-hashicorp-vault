@@ -2,17 +2,11 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
 
-	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
+	cfg "github.com/conductorone/baton-hashicorp-vault/pkg/config"
 	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
-	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/types"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
+	"github.com/conductorone/baton-sdk/pkg/connectorrunner"
 )
 
 var (
@@ -22,11 +16,24 @@ var (
 
 func main() {
 	ctx := context.Background()
+	config.RunConnector(
+		ctx,
+		connectorName,
+		version,
+		cfg.Config,
+		connector.New,
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilder(&connector.Connector{}),
+	)
+}
+
+/*
+func main() {
+	ctx := context.Background()
 	_, cmd, err := config.DefineConfiguration(
 		ctx,
 		connectorName,
 		getConnector,
-		Configurations,
+		cfg.Configurations,
 	)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
@@ -44,10 +51,10 @@ func main() {
 func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer, error) {
 	var (
 		hcpClient = client.NewClient()
-		token     = cfg.GetString(VaultTokenField.GetName())
-		roleID    = cfg.GetString(RoleIDField.GetName())
-		secretID  = cfg.GetString(SecretIDField.GetName())
-		host      = cfg.GetString(VaultHostField.GetName())
+		token     = cfg.GetString(config2.VaultTokenField.GetName())
+		roleID    = cfg.GetString(config2.RoleIDField.GetName())
+		secretID  = cfg.GetString(config2.SecretIDField.GetName())
+		host      = cfg.GetString(config2.VaultHostField.GetName())
 	)
 	l := ctxzap.Extract(ctx)
 	err := hcpClient.WithAddress(host)
@@ -75,3 +82,4 @@ func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer,
 
 	return c, nil
 }
+*/

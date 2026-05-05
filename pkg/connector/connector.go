@@ -5,8 +5,10 @@ import (
 	"io"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
+	cfg "github.com/conductorone/baton-hashicorp-vault/pkg/config"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 )
 
@@ -15,8 +17,8 @@ type Connector struct {
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
-func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.ResourceSyncer {
-	return []connectorbuilder.ResourceSyncer{
+func (d *Connector) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncerV2 {
+	return []connectorbuilder.ResourceSyncerV2{
 		newUserBuilder(d.client),
 		newRoleBuilder(d.client),
 		newPolicyBuilder(d.client),
@@ -29,12 +31,12 @@ func (d *Connector) ResourceSyncers(ctx context.Context) []connectorbuilder.Reso
 
 // Asset takes an input AssetRef and attempts to fetch it using the connector's authenticated http client
 // It streams a response, always starting with a metadata object, following by chunked payloads for the asset.
-func (d *Connector) Asset(ctx context.Context, asset *v2.AssetRef) (string, io.ReadCloser, error) {
+func (d *Connector) Asset(_ context.Context, _ *v2.AssetRef) (string, io.ReadCloser, error) {
 	return "", nil, nil
 }
 
 // Metadata returns metadata about the connector.
-func (d *Connector) Metadata(ctx context.Context) (*v2.ConnectorMetadata, error) {
+func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 	return &v2.ConnectorMetadata{
 		DisplayName: "HashiCorp Connector",
 		Description: "Connector syncing users, roles and secrets from HashiCorp.",
@@ -47,7 +49,7 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 	return nil, nil
 }
 
-// New returns a new instance of the connector.
+/*
 func New(ctx context.Context, hcpClient *client.HCPClient) (*Connector, error) {
 	var err error
 	if hcpClient.IsConfigured() {
@@ -60,4 +62,32 @@ func New(ctx context.Context, hcpClient *client.HCPClient) (*Connector, error) {
 	return &Connector{
 		client: hcpClient,
 	}, nil
+}
+*/
+
+// New returns a new instance of the connector.
+func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
+	hcpClient := client.NewClient()
+
+	err := hcpClient.WithAddress(config.VaultHost)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	if config.VaultToken != "" {
+		hcpClient.WithBearerToken(config.VaultToken)
+	} else {
+		hcpClient.WithAppRole(config.RoleId, config.SecretId)
+	}
+
+	if hcpClient.IsConfigured() {
+		hcpClient, err = client.New(ctx, hcpClient)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return &Connector{
+		client: hcpClient,
+	}, nil, nil
 }

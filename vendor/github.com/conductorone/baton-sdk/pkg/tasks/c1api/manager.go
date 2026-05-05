@@ -6,10 +6,12 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/anypb"
 
 	"github.com/conductorone/baton-sdk/pkg/annotations"
+	"github.com/conductorone/baton-sdk/pkg/uotel"
 
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
@@ -17,6 +19,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	v1 "github.com/conductorone/baton-sdk/pb/c1/connectorapi/baton/v1"
 	"github.com/conductorone/baton-sdk/pkg/tasks"
 	"github.com/conductorone/baton-sdk/pkg/types"
@@ -42,13 +45,18 @@ var (
 )
 
 type c1ApiTaskManager struct {
-	mtx               sync.Mutex
-	started           bool
-	queue             []*v1.Task
-	serviceClient     BatonServiceClient
-	tempDir           string
-	skipFullSync      bool
-	runnerShouldDebug bool
+	mtx                                 sync.Mutex
+	started                             bool
+	queue                               []*v1.Task
+	serviceClient                       BatonServiceClient
+	tempDir                             string
+	skipFullSync                        bool
+	runnerShouldDebug                   bool
+	externalResourceC1Z                 string
+	externalResourceEntitlementIdFilter string
+	targetedSyncResources               []*v2.Resource
+	syncResourceTypeIDs                 []string
+	workerCount                         int
 }
 
 // getHeartbeatInterval returns an appropriate heartbeat interval. If the interval is 0, it will return the default heartbeat interval.
@@ -79,6 +87,9 @@ func getNextPoll(d time.Duration) time.Duration {
 }
 
 func (c *c1ApiTaskManager) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
+	ctx, span := tracer.Start(ctx, "c1ApiTaskManager.Next", trace.WithNewRoot())
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 	l := ctxzap.Extract(ctx)
 
 	c.mtx.Lock()
@@ -87,13 +98,11 @@ func (c *c1ApiTaskManager) Next(ctx context.Context) (*v1.Task, time.Duration, e
 		l.Debug("c1_api_task_manager.Next(): queueing initial hello task")
 		c.started = true
 		// Append a hello task to the queue on startup.
-		c.queue = append(c.queue, &v1.Task{
+		c.queue = append(c.queue, v1.Task_builder{
 			Id:     "",
 			Status: v1.Task_STATUS_PENDING,
-			TaskType: &v1.Task_Hello{
-				Hello: &v1.Task_HelloTask{},
-			},
-		})
+			Hello:  &v1.Task_HelloTask{},
+		}.Build())
 
 		// TODO(morgabra) Get resumable tasks here and queue them.
 	}
@@ -125,11 +134,15 @@ func (c *c1ApiTaskManager) Next(ctx context.Context) (*v1.Task, time.Duration, e
 		zap.Stringer("task_type", tasks.GetType(resp.GetTask())),
 	)
 
-	l.Debug("c1_api_task_manager.Next(): got task")
+	l.Debug("c1_api_task_manager.Next(): got task", zap.Duration("next_poll", nextPoll))
 	return resp.GetTask(), nextPoll, nil
 }
 
-func (c *c1ApiTaskManager) finishTask(ctx context.Context, task *v1.Task, resp proto.Message, annos annotations.Annotations, err error) error {
+func (c *c1ApiTaskManager) finishTask(ctx context.Context, task *v1.Task, resp proto.Message, annos annotations.Annotations, taskError error) error {
+	ctx, span := tracer.Start(ctx, "c1ApiTaskManager.finishTask")
+	// NOTE: this error is for internal finish Task errors, not the task error itself!
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 	l := ctxzap.Extract(ctx)
 	l = l.With(
 		zap.String("task_id", task.GetId()),
@@ -148,18 +161,16 @@ func (c *c1ApiTaskManager) finishTask(ctx context.Context, task *v1.Task, resp p
 		}
 	}
 
-	if err == nil {
+	if taskError == nil {
 		l.Info("c1_api_task_manager.finishTask(): finishing task successfully")
-		_, err = c.serviceClient.FinishTask(finishCtx, &v1.BatonServiceFinishTaskRequest{
+		_, err = c.serviceClient.FinishTask(finishCtx, v1.BatonServiceFinishTaskRequest_builder{
 			TaskId: task.GetId(),
 			Status: nil,
-			FinalState: &v1.BatonServiceFinishTaskRequest_Success_{
-				Success: &v1.BatonServiceFinishTaskRequest_Success{
-					Annotations: annos,
-					Response:    marshalledResp,
-				},
-			},
-		})
+			Success: v1.BatonServiceFinishTaskRequest_Success_builder{
+				Annotations: annos,
+				Response:    marshalledResp,
+			}.Build(),
+		}.Build())
 		if err != nil {
 			l.Error("c1_api_task_manager.finishTask(): error while attempting to finish task successfully", zap.Error(err))
 			return err
@@ -168,33 +179,38 @@ func (c *c1ApiTaskManager) finishTask(ctx context.Context, task *v1.Task, resp p
 		return nil
 	}
 
-	l.Error("c1_api_task_manager.finishTask(): finishing task with error", zap.Error(err))
+	l.Error("c1_api_task_manager.finishTask(): finishing task with error", zap.Error(taskError))
 
-	statusErr, ok := status.FromError(err)
+	statusErr, ok := status.FromError(taskError)
 	if !ok {
-		statusErr = status.New(codes.Unknown, err.Error())
+		switch {
+		case errors.Is(taskError, context.Canceled):
+			statusErr = status.New(codes.Canceled, taskError.Error())
+		case errors.Is(taskError, context.DeadlineExceeded):
+			statusErr = status.New(codes.DeadlineExceeded, taskError.Error())
+		default:
+			statusErr = status.New(codes.Unknown, taskError.Error())
+		}
 	}
 
-	_, rpcErr := c.serviceClient.FinishTask(finishCtx, &v1.BatonServiceFinishTaskRequest{
+	_, err = c.serviceClient.FinishTask(finishCtx, v1.BatonServiceFinishTaskRequest_builder{
 		TaskId: task.GetId(),
 		Status: &pbstatus.Status{
 			//nolint:gosec // No risk of overflow because `Code` is a small enum.
 			Code:    int32(statusErr.Code()),
 			Message: statusErr.Message(),
 		},
-		FinalState: &v1.BatonServiceFinishTaskRequest_Error_{
-			Error: &v1.BatonServiceFinishTaskRequest_Error{
-				NonRetryable: errors.Is(err, ErrTaskNonRetryable),
-				Annotations:  annos,
-			},
-		},
-	})
-	if rpcErr != nil {
-		l.Error("c1_api_task_manager.finishTask(): error finishing task", zap.Error(rpcErr))
-		return errors.Join(err, rpcErr)
+		Error: v1.BatonServiceFinishTaskRequest_Error_builder{
+			NonRetryable: errors.Is(taskError, ErrTaskNonRetryable),
+			Annotations:  annos,
+		}.Build(),
+	}.Build())
+	if err != nil {
+		l.Error("c1_api_task_manager.finishTask(): error finishing task", zap.Error(err))
+		return errors.Join(taskError, err)
 	}
 
-	return err
+	return nil
 }
 
 func (c *c1ApiTaskManager) GetTempDir() string {
@@ -206,6 +222,9 @@ func (c *c1ApiTaskManager) ShouldDebug() bool {
 }
 
 func (c *c1ApiTaskManager) Process(ctx context.Context, task *v1.Task, cc types.ConnectorClient) error {
+	ctx, span := tracer.Start(ctx, "c1ApiTaskManager.Process", trace.WithNewRoot())
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
 	l := ctxzap.Extract(ctx)
 	if task == nil {
 		l.Debug("c1_api_task_manager.Process(): process called with nil task -- continuing")
@@ -233,7 +252,16 @@ func (c *c1ApiTaskManager) Process(ctx context.Context, task *v1.Task, cc types.
 	var handler tasks.TaskHandler
 	switch tasks.GetType(task) {
 	case taskTypes.FullSyncType:
-		handler = newFullSyncTaskHandler(task, tHelpers, c.skipFullSync)
+		handler = newFullSyncTaskHandler(
+			task,
+			tHelpers,
+			c.skipFullSync,
+			c.externalResourceC1Z,
+			c.externalResourceEntitlementIdFilter,
+			c.targetedSyncResources,
+			c.syncResourceTypeIDs,
+			c.workerCount,
+		)
 	case taskTypes.HelloType:
 		handler = newHelloTaskHandler(task, tHelpers)
 	case taskTypes.GrantType:
@@ -260,11 +288,23 @@ func (c *c1ApiTaskManager) Process(ctx context.Context, task *v1.Task, cc types.
 		handler = newBulkCreateTicketTaskHandler(task, tHelpers)
 	case taskTypes.BulkGetTicketsType:
 		handler = newBulkGetTicketTaskHandler(task, tHelpers)
+	case taskTypes.ActionListSchemasType:
+		handler = newActionListSchemasTaskHandler(task, tHelpers)
+	case taskTypes.ActionGetSchemaType:
+		handler = newActionGetSchemaTaskHandler(task, tHelpers)
+	case taskTypes.ActionInvokeType:
+		handler = newActionInvokeTaskHandler(task, tHelpers)
+	case taskTypes.ActionStatusType:
+		handler = newActionStatusTaskHandler(task, tHelpers)
+	case taskTypes.ListEventFeedsType:
+		handler = NewListEventFeedsHandler(task, tHelpers)
+	case taskTypes.ListEventsType:
+		handler = NewListEventsHandler(task, tHelpers)
 	default:
 		return c.finishTask(ctx, task, nil, nil, errors.New("unsupported task type"))
 	}
 
-	err := handler.HandleTask(ctx)
+	err = handler.HandleTask(ctx)
 	if err != nil {
 		l.Error("c1_api_task_manager.Process(): error while handling task", zap.Error(err))
 		return err
@@ -273,15 +313,31 @@ func (c *c1ApiTaskManager) Process(ctx context.Context, task *v1.Task, cc types.
 	return nil
 }
 
-func NewC1TaskManager(ctx context.Context, clientID string, clientSecret string, tempDir string, skipFullSync bool) (tasks.Manager, error) {
+func NewC1TaskManager(
+	ctx context.Context,
+	clientID string,
+	clientSecret string,
+	tempDir string,
+	skipFullSync bool,
+	externalC1Z string,
+	externalResourceEntitlementIdFilter string,
+	targetedSyncResources []*v2.Resource,
+	syncResourceTypeIDs []string,
+	workerCount int,
+) (tasks.Manager, error) {
 	serviceClient, err := newServiceClient(ctx, clientID, clientSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	return &c1ApiTaskManager{
-		serviceClient: serviceClient,
-		tempDir:       tempDir,
-		skipFullSync:  skipFullSync,
+		serviceClient:                       serviceClient,
+		tempDir:                             tempDir,
+		skipFullSync:                        skipFullSync,
+		externalResourceC1Z:                 externalC1Z,
+		externalResourceEntitlementIdFilter: externalResourceEntitlementIdFilter,
+		targetedSyncResources:               targetedSyncResources,
+		syncResourceTypeIDs:                 syncResourceTypeIDs,
+		workerCount:                         workerCount,
 	}, nil
 }
