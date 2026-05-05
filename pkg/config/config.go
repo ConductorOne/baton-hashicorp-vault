@@ -7,22 +7,26 @@ import (
 var (
 	VaultTokenField = field.StringField(
 		"vault-token",
+		field.WithDisplayName("Vault Token"),
 		field.WithDescription("Vault token for direct authentication"),
 		field.WithIsSecret(true),
 	)
 	RoleIDField = field.StringField(
 		"role-id",
+		field.WithDisplayName("Role ID"),
 		field.WithDescription("AppRole role ID for Vault AppRole authentication"),
 	)
 	SecretIDField = field.StringField(
 		"secret-id",
+		field.WithDisplayName("Secret ID"),
 		field.WithDescription("AppRole secret ID for Vault AppRole authentication"),
 		field.WithIsSecret(true),
 	)
 	VaultHostField = field.StringField(
 		"vault-host",
-		field.WithRequired(true),
+		field.WithDisplayName("Vault host"),
 		field.WithDescription("Vault address or Host. Ex. http://127.0.0.1:8200"),
+		field.WithRequired(true),
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
