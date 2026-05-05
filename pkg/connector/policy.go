@@ -11,6 +11,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
 )
@@ -24,14 +25,14 @@ func (p *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return policyResourceType
 }
 
-func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, pToken *pagination.Token) ([]*v2.Resource, string, annotations.Annotations, error) {
+func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rsTypes.SyncOpAttrs) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
 	var (
 		err error
 		rv  []*v2.Resource
 	)
-	_, bag, err := unmarshalSkipToken(pToken)
+	_, bag, err := unmarshalSkipToken(&opts.PageToken)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	if bag.Current() == nil {
@@ -42,12 +43,12 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 
 	policies, nextPageToken, err := p.client.ListAllPolicies(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	err = bag.Next(nextPageToken)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, policy := range policies.Data.Policies {
@@ -57,79 +58,79 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 			MountType: policies.MountType,
 		}, nil)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 		rv = append(rv, ur)
 	}
 
 	nextPageToken, err = bag.Marshal()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rsTypes.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
-func (p *policyBuilder) Entitlements(_ context.Context, resource *v2.Resource, _ *pagination.Token) ([]*v2.Entitlement, string, annotations.Annotations, error) {
+func (p *policyBuilder) Entitlements(_ context.Context, res *v2.Resource, _ rsTypes.SyncOpAttrs) ([]*v2.Entitlement, *rsTypes.SyncOpResults, error) {
 	var rv []*v2.Entitlement
 	assigmentOptions := []ent.EntitlementOption{
 		ent.WithGrantableTo(userResourceType),
-		ent.WithDescription(fmt.Sprintf("Assigned to %s policy", resource.DisplayName)),
-		ent.WithDisplayName(fmt.Sprintf("%s policy %s", resource.DisplayName, assignedEntitlement)),
+		ent.WithDescription(fmt.Sprintf("Assigned to %s policy", res.DisplayName)),
+		ent.WithDisplayName(fmt.Sprintf("%s policy %s", res.DisplayName, assignedEntitlement)),
 	}
-	rv = append(rv, ent.NewAssignmentEntitlement(resource, assignedEntitlement, assigmentOptions...))
+	rv = append(rv, ent.NewAssignmentEntitlement(res, assignedEntitlement, assigmentOptions...))
 
-	return rv, "", nil, nil
+	return rv, nil, nil
 }
 
-func (p *policyBuilder) Grants(ctx context.Context, resource *v2.Resource, pToken *pagination.Token) ([]*v2.Grant, string, annotations.Annotations, error) {
+func (p *policyBuilder) Grants(ctx context.Context, res *v2.Resource, opts rsTypes.SyncOpAttrs) ([]*v2.Grant, *rsTypes.SyncOpResults, error) {
 	var (
 		err error
 		rv  []*v2.Grant
 	)
-	bag, _, err := getToken(pToken, policyResourceType)
+	bag, _, err := getToken(&opts.PageToken, policyResourceType)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	users, nextPageToken, err := p.client.ListAllUsers(ctx)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	err = bag.Next(nextPageToken)
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
 	for _, user := range users.Data.Keys {
 		userInfo, err := p.client.GetUser(ctx, user)
 		if err != nil {
-			return nil, "", nil, err
+			return nil, nil, err
 		}
 
 		for _, userPolicy := range userInfo.Data.TokenPolicies {
-			if userPolicy != resource.Id.Resource {
+			if userPolicy != res.Id.Resource {
 				continue
 			}
 
-			grant := grant.NewGrant(resource, assignedEntitlement, &v2.ResourceId{
+			g := grant.NewGrant(res, assignedEntitlement, &v2.ResourceId{
 				ResourceType: userResourceType.Id,
 				Resource:     user,
 			})
-			rv = append(rv, grant)
+			rv = append(rv, g)
 		}
 	}
 
 	nextPageToken, err = bag.Marshal()
 	if err != nil {
-		return nil, "", nil, err
+		return nil, nil, err
 	}
 
-	return rv, nextPageToken, nil, nil
+	return rv, &rsTypes.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
-func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) (annotations.Annotations, error) {
+func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
 	l := ctxzap.Extract(ctx)
 	if principal.Id.ResourceType != userResourceType.Id {
 		l.Warn(
@@ -137,14 +138,14 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 			zap.String("principal_type", principal.Id.ResourceType),
 			zap.String("principal_id", principal.Id.Resource),
 		)
-		return nil, fmt.Errorf("baton-hashicorp-vault: only users can be granted policy membership")
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: only users can be granted policy membership")
 	}
 
 	policyId := entitlement.Resource.Id.Resource
 	userId := principal.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
 	if err != nil {
-		return nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy grant: %w", userId, err)
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy grant: %w", userId, err)
 	}
 
 	var policies = []string{}
@@ -158,10 +159,11 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 
 	err = p.client.UpdateUserPolicy(ctx, policies, userId)
 	if err != nil {
-		return nil, fmt.Errorf("baton-hashicorp-vault: failed to update policies for user %q: %w", userId, err)
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: failed to update policies for user %q: %w", userId, err)
 	}
 
-	return nil, nil
+	g := grant.NewGrant(entitlement.Resource, assignedEntitlement, principal.Id)
+	return []*v2.Grant{g}, nil, nil
 }
 
 func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
