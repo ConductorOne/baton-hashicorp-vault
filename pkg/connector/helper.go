@@ -13,7 +13,7 @@ import (
 )
 
 func userResource(ctx context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
-	var userStatus v2.UserTrait_Status_Status = v2.UserTrait_Status_STATUS_ENABLED
+	userStatus := v2.UserTrait_Status_STATUS_ENABLED
 	profile := map[string]interface{}{
 		"user_id":    user.ID,
 		"user_name":  user.Name,
