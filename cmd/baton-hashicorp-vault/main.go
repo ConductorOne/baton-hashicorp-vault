@@ -2,76 +2,25 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"os"
 
-	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
+	cfg "github.com/conductorone/baton-hashicorp-vault/pkg/config"
 	"github.com/conductorone/baton-hashicorp-vault/pkg/connector"
 	"github.com/conductorone/baton-sdk/pkg/config"
-	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
-	"github.com/conductorone/baton-sdk/pkg/types"
-	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
-	"github.com/spf13/viper"
-	"go.uber.org/zap"
+	"github.com/conductorone/baton-sdk/pkg/connectorrunner"
 )
 
 var (
-	version       = "dev"
-	connectorName = "baton-hashicorp-vault"
+	version = "dev"
 )
 
 func main() {
 	ctx := context.Background()
-	_, cmd, err := config.DefineConfiguration(
+	config.RunConnector(
 		ctx,
-		connectorName,
-		getConnector,
-		Configurations,
+		"baton-hashicorp-vault",
+		version,
+		cfg.Config,
+		connector.New,
+		connectorrunner.WithDefaultCapabilitiesConnectorBuilderV2(&connector.Connector{}),
 	)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-
-	cmd.Version = version
-	err = cmd.Execute()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err.Error())
-		os.Exit(1)
-	}
-}
-
-func getConnector(ctx context.Context, cfg *viper.Viper) (types.ConnectorServer, error) {
-	var (
-		hcpClient = client.NewClient()
-		token     = cfg.GetString(VaultTokenField.GetName())
-		roleID    = cfg.GetString(RoleIDField.GetName())
-		secretID  = cfg.GetString(SecretIDField.GetName())
-		host      = cfg.GetString(VaultHostField.GetName())
-	)
-	l := ctxzap.Extract(ctx)
-	err := hcpClient.WithAddress(host)
-	if err != nil {
-		return nil, err
-	}
-
-	if token != "" {
-		hcpClient.WithBearerToken(token)
-	} else {
-		hcpClient.WithAppRole(roleID, secretID)
-	}
-
-	cb, err := connector.New(ctx, hcpClient)
-	if err != nil {
-		l.Error("error creating connector", zap.Error(err))
-		return nil, err
-	}
-
-	c, err := connectorbuilder.NewConnector(ctx, cb)
-	if err != nil {
-		l.Error("error creating connector", zap.Error(err))
-		return nil, err
-	}
-
-	return c, nil
 }

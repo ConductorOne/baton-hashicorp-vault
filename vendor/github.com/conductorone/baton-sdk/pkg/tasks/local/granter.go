@@ -5,10 +5,13 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
+
 	v1 "github.com/conductorone/baton-sdk/pb/c1/connectorapi/baton/v1"
 	"github.com/conductorone/baton-sdk/pkg/provisioner"
 	"github.com/conductorone/baton-sdk/pkg/tasks"
 	"github.com/conductorone/baton-sdk/pkg/types"
+	"github.com/conductorone/baton-sdk/pkg/uotel"
 )
 
 type localGranter struct {
@@ -31,17 +34,21 @@ func (m *localGranter) ShouldDebug() bool {
 func (m *localGranter) Next(ctx context.Context) (*v1.Task, time.Duration, error) {
 	var task *v1.Task
 	m.o.Do(func() {
-		task = &v1.Task{
-			TaskType: &v1.Task_Grant{},
-		}
+		task = v1.Task_builder{
+			Grant: &v1.Task_GrantTask{},
+		}.Build()
 	})
 	return task, 0, nil
 }
 
 func (m *localGranter) Process(ctx context.Context, task *v1.Task, cc types.ConnectorClient) error {
+	ctx, span := tracer.Start(ctx, "localGranter.Process", trace.WithNewRoot())
+	var err error
+	defer func() { uotel.EndSpanWithError(span, err) }()
+
 	granter := provisioner.NewGranter(cc, m.dbPath, m.entitlementID, m.principalID, m.principalType)
 
-	err := granter.Run(ctx)
+	err = granter.Run(ctx)
 	if err != nil {
 		return err
 	}

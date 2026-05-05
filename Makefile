@@ -1,6 +1,7 @@
 GOOS = $(shell go env GOOS)
 GOARCH = $(shell go env GOARCH)
 BUILD_DIR = dist/${GOOS}_${GOARCH}
+GENERATED_CONF := pkg/config/conf.gen.go
 
 ifeq ($(GOOS),windows)
 OUTPUT_PATH = ${BUILD_DIR}/baton-hashicorp-vault.exe
@@ -8,9 +9,22 @@ else
 OUTPUT_PATH = ${BUILD_DIR}/baton-hashicorp-vault
 endif
 
+# Set the build tag conditionally based on ENABLE_LAMBDA
+ifdef BATON_LAMBDA_SUPPORT
+	BUILD_TAGS=-tags baton_lambda_support
+else
+	BUILD_TAGS=
+endif
+
 .PHONY: build
-build:
-	go build -o ${OUTPUT_PATH} ./cmd/baton-hashicorp-vault
+build: ${GENERATED_CONF}
+	go build ${BUILD_TAGS} -o ${OUTPUT_PATH} ./cmd/baton-hashicorp-vault
+
+$(GENERATED_CONF): pkg/config/config.go go.mod
+	@echo "Generating $(GENERATED_CONF)..."
+	go generate -tags=generate ./pkg/config
+
+generate: $(GENERATED_CONF)
 
 .PHONY: update-deps
 update-deps:
@@ -23,6 +37,15 @@ add-dep:
 	go mod tidy -v
 	go mod vendor
 
+.PHONY: update-baton-sdk-deps
+update-baton-sdk-deps:
+	go get -u github.com/conductorone/baton-sdk
+	go mod tidy -v
+	go mod vendor
+	@echo "✅ Baton-sdk dependencies updated successfully"
+
+GOLANGCI_LINT_VERSION = v2.11.4
+
 .PHONY: lint
 lint:
-	golangci-lint run
+	go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --timeout=3m
