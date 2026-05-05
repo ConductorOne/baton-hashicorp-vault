@@ -10,7 +10,7 @@ import (
 func TestConfigs(t *testing.T) {
 	configurationSchema := field.NewConfiguration(
 		ConfigurationFields,
-		FieldRelationships...,
+		field.WithConstraints(FieldRelationships...),
 	)
 
 	testCases := []test.TestCase{
@@ -73,5 +73,5 @@ func TestConfigs(t *testing.T) {
 		},
 	}
 
-	test.ExerciseTestCases(t, configurationSchema, ValidateConfig, testCases)
+	test.ExerciseTestCases(t, configurationSchema, nil, testCases)
 }

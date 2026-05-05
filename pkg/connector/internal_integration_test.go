@@ -15,6 +15,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
+	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,11 +55,11 @@ func TestUsersBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := u.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := u.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -76,11 +77,11 @@ func TestPolicyBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := p.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := p.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -98,11 +99,11 @@ func TestRoleBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := r.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := r.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -120,11 +121,11 @@ func TestSecretsBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := s.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := s.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -142,11 +143,11 @@ func TestAuthMethodsBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := a.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := a.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -164,11 +165,11 @@ func TestGroupsBuilderList(t *testing.T) {
 	}
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := g.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := g.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -187,11 +188,11 @@ func TestEntitiesBuilderList(t *testing.T) {
 
 	var token = "{}"
 	for token != "" {
-		_, tk, _, err := e.List(ctxTest, &v2.ResourceId{}, &pagination.Token{
-			Token: token,
+		_, res, err := e.List(ctxTest, &v2.ResourceId{}, rsTypes.SyncOpAttrs{
+			PageToken: pagination.Token{Token: token},
 		})
 		require.Nil(t, err)
-		token = tk
+		token = res.NextPageToken
 	}
 }
 
@@ -252,7 +253,7 @@ func TestPolicyGrant(t *testing.T) {
 		resourceType: policyResourceType,
 		client:       cliTest,
 	}
-	_, err = r.Grant(ctxTest, &v2.Resource{
+	_, _, err = r.Grant(ctxTest, &v2.Resource{
 		Id: &v2.ResourceId{
 			ResourceType: userResourceType.Id,
 			Resource:     grantPrincipal,
@@ -390,8 +391,8 @@ func TestPolicyGrants(t *testing.T) {
 		resourceType: policyResourceType,
 		client:       cliTest,
 	}
-	_, _, _, err = d.Grants(ctxTest, &v2.Resource{
+	_, _, err = d.Grants(ctxTest, &v2.Resource{
 		Id: &v2.ResourceId{ResourceType: policyResourceType.Id, Resource: "root"},
-	}, &pagination.Token{})
+	}, rsTypes.SyncOpAttrs{})
 	require.Nil(t, err)
 }
