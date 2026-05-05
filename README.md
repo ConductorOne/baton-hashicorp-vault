@@ -12,8 +12,13 @@ HashiCorp Vault is a tool that allows you to safely manage secrets. By secrets, 
 
 ## Prerequisites
 
-Host and token for your HashiCorp account. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser.
+Host and credentials for your HashiCorp Vault instance. You can access the Hashicorp Vault web UI by starting the Vault server in dev mode with `vault server -dev` and navigating to `http://127.0.0.1:8200/ui` in your browser.
 Check out their [documentation](https://developer.hashicorp.com/vault/install) for more tips on getting started.
+
+The connector supports two authentication methods — use one or the other, not both:
+
+- **Vault Token**: provide a `--vault-token` directly.
+- **AppRole**: provide both `--role-id` and `--secret-id`. The connector will exchange them for a token via the [AppRole auth method](https://developer.hashicorp.com/vault/docs/auth/approle).
 
 ## brew
 
@@ -25,8 +30,15 @@ baton resources
 
 ## docker
 
+Using a Vault Token:
 ```
 docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
+```
+
+Using AppRole:
+```
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_ROLE_ID=<role-id> -e BATON_SECRET_ID=<secret-id> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
@@ -44,9 +56,16 @@ baton resources
 
 Run the docker-compose file included in the connector for local testing.
 
-By using docker compose, you can run the following command to sync resources.
+By using docker compose, you can run the following commands to sync resources.
+
+Using a Vault Token:
 ```
- baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
+baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --vault-token 'testtoken'
+```
+
+Using AppRole:
+```
+baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --role-id '<role-id>' --secret-id '<secret-id>'
 ```
 
 # Data Model
@@ -93,7 +112,9 @@ Flags:
       --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
       --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
       --vault-host string      required: Vault address or Host. Ex. http://127.0.0.1:8200 ($BATON_VAULT_HOST)
-      --vault-token string     required: Vault Token ($BATON_VAULT_TOKEN)
+      --vault-token string     Vault token for direct authentication. Mutually exclusive with --role-id ($BATON_VAULT_TOKEN)
+      --role-id string         AppRole role ID for Vault AppRole authentication. Mutually exclusive with --vault-token ($BATON_ROLE_ID)
+      --secret-id string       AppRole secret ID for Vault AppRole authentication. Required when --role-id is set ($BATON_SECRET_ID)
   -v, --version                version for baton-hashicorp-vault
 
 Use "baton-hashicorp-vault [command] --help" for more information about a command.
