@@ -8,6 +8,7 @@ var (
 	VaultTokenField = field.StringField(
 		"vault-token",
 		field.WithDescription("Vault token for direct authentication"),
+		field.WithIsSecret(true),
 	)
 	RoleIDField = field.StringField(
 		"role-id",
@@ -25,7 +26,7 @@ var (
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
-		// Must use either vault-token or role-id (not both, not either)
+		// Must use either vault-token or role-id (not both, not neither)
 		field.FieldsAtLeastOneUsed(VaultTokenField, RoleIDField),
 		field.FieldsMutuallyExclusive(VaultTokenField, RoleIDField),
 		// role-id and secret-id must be provided together

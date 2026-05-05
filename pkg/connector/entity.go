@@ -42,7 +42,7 @@ func (e *entityBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		ur, err := entityResource(ctx, &client.APIResource{
 			ID:   entityId,
 			Name: entity.Name,
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

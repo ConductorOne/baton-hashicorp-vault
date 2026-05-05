@@ -50,7 +50,7 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 			ID:        user,
 			Name:      user,
 			MountType: roles.MountType,
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

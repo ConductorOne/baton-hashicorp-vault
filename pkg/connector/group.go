@@ -42,7 +42,7 @@ func (g *groupBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId
 		ur, err := groupResource(ctx, &client.APIResource{
 			ID:   groupId,
 			Name: group.Name,
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

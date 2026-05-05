@@ -42,7 +42,7 @@ func (a *authMethodBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 		ur, err := authMethodResource(ctx, &client.APIResource{
 			ID:   removeTrailingSlash(method),
 			Name: removeTrailingSlash(method),
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

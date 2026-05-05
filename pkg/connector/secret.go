@@ -43,7 +43,7 @@ func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 			ID:        secret,
 			Name:      secret,
 			MountType: secrets.MountType,
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

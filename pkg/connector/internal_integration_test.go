@@ -225,7 +225,7 @@ func getPolicyForTesting(ctxTest context.Context, id string, name string) (*v2.R
 	return policyResource(ctxTest, &client.APIResource{
 		ID:   id,
 		Name: name,
-	}, nil)
+	})
 }
 
 func TestPolicyGrant(t *testing.T) {

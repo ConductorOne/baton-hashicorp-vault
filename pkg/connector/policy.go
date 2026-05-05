@@ -56,7 +56,7 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 			ID:        policy,
 			Name:      policy,
 			MountType: policies.MountType,
-		}, nil)
+		})
 		if err != nil {
 			return nil, nil, err
 		}

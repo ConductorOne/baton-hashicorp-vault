@@ -12,7 +12,7 @@ import (
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
 
-func userResource(ctx context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func userResource(_ context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
 	userStatus := v2.UserTrait_Status_STATUS_ENABLED
 	profile := map[string]interface{}{
 		"user_id":    user.ID,
@@ -38,7 +38,7 @@ func userResource(ctx context.Context, user *client.APIResource, parentResourceI
 	return ret, nil
 }
 
-func roleResource(ctx context.Context, role *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func roleResource(_ context.Context, role *client.APIResource) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"id":         role.ID,
 		"name":       role.Name,
@@ -57,7 +57,7 @@ func roleResource(ctx context.Context, role *client.APIResource, parentResourceI
 	return resource, nil
 }
 
-func policyResource(ctx context.Context, policy *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func policyResource(_ context.Context, policy *client.APIResource) (*v2.Resource, error) {
 	var opts []rs.ResourceOption
 	profile := map[string]interface{}{
 		"id":         policy.ID,
@@ -82,7 +82,7 @@ func policyResource(ctx context.Context, policy *client.APIResource, parentResou
 	return resource, nil
 }
 
-func secretResource(ctx context.Context, secret *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func secretResource(_ context.Context, secret *client.APIResource) (*v2.Resource, error) {
 	var opts []rs.ResourceOption
 	profile := map[string]interface{}{
 		"id":         secret.ID,
@@ -107,7 +107,7 @@ func secretResource(ctx context.Context, secret *client.APIResource, parentResou
 	return resource, nil
 }
 
-func groupResource(ctx context.Context, group *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func groupResource(_ context.Context, group *client.APIResource) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"group_name": group.Name,
 		"group_id":   group.ID,
@@ -176,7 +176,7 @@ func getToken(pToken *pagination.Token, resourceType *v2.ResourceType) (*paginat
 	return bag, pageToken, nil
 }
 
-func authMethodResource(ctx context.Context, secret *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func authMethodResource(_ context.Context, secret *client.APIResource) (*v2.Resource, error) {
 	var opts []rs.ResourceOption
 	profile := map[string]interface{}{
 		"id":   secret.ID,
@@ -200,7 +200,7 @@ func authMethodResource(ctx context.Context, secret *client.APIResource, parentR
 	return resource, nil
 }
 
-func entityResource(ctx context.Context, entity *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
+func entityResource(_ context.Context, entity *client.APIResource) (*v2.Resource, error) {
 	var opts []rs.ResourceOption
 	profile := map[string]interface{}{
 		"id":   entity.ID,
