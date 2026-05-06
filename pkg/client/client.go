@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -49,6 +51,7 @@ type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
 	auth       *auth
 	baseUrl    string
+	mu         sync.Mutex
 }
 
 type CustomErr struct {
@@ -115,6 +118,9 @@ func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
 	}
 
 	h.auth.bearerToken = res.Auth.ClientToken
+	if res.Auth.LeaseDuration > 0 {
+		h.auth.expiresAt = time.Now().UTC().Add(time.Duration(res.Auth.LeaseDuration)*time.Second - 30*time.Second)
+	}
 	return nil
 }
 
@@ -129,6 +135,23 @@ func (h *HCPClient) WithAddress(host string) error {
 
 func (h *HCPClient) getToken() string {
 	return h.auth.bearerToken
+}
+
+// ensureValidToken refreshes the AppRole token if it has expired or is about to.
+// Static bearer token auth (no roleID/secretID) is unmanaged and returned as-is.
+func (h *HCPClient) ensureValidToken(ctx context.Context) error {
+	if h.auth.roleID == "" || h.auth.secretID == "" {
+		return nil
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	if h.auth.bearerToken != "" && time.Now().UTC().Before(h.auth.expiresAt) {
+		return nil
+	}
+
+	return h.AppRoleLogin(ctx)
 }
 
 func isValidUrl(baseUrl string) bool {
@@ -457,6 +480,11 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		resp *http.Response
 		err  error
 	)
+
+	if err = h.ensureValidToken(ctx); err != nil {
+		return err
+	}
+
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to parse request URL %q: %w", endpointUrl, err)
