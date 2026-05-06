@@ -1,9 +1,12 @@
 package client
 
+import "time"
+
 type auth struct {
 	bearerToken string
 	roleID      string
 	secretID    string
+	expiresAt   time.Time
 }
 
 type appRoleLoginRequest struct {
@@ -16,7 +19,8 @@ type appRoleLoginResponse struct {
 }
 
 type appRoleAuth struct {
-	ClientToken string `json:"client_token"`
+	ClientToken   string `json:"client_token"`
+	LeaseDuration int    `json:"lease_duration"`
 }
 
 type CommonAPIData struct {

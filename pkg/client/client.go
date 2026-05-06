@@ -10,6 +10,8 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
@@ -49,6 +51,7 @@ type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
 	auth       *auth
 	baseUrl    string
+	mu         sync.Mutex
 }
 
 type CustomErr struct {
@@ -78,7 +81,7 @@ func (h *HCPClient) IsConfigured() bool {
 	return h.auth.bearerToken != "" || (h.auth.roleID != "" && h.auth.secretID != "")
 }
 
-func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
+func (h *HCPClient) appRoleLogin(ctx context.Context) error {
 	loginURL, err := url.JoinPath(h.baseUrl, AppRoleLoginEndpoint)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to build approle login URL: %w", err)
@@ -115,6 +118,14 @@ func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
 	}
 
 	h.auth.bearerToken = res.Auth.ClientToken
+	if res.Auth.LeaseDuration > 0 {
+		ttl := time.Duration(res.Auth.LeaseDuration) * time.Second
+		buffer := 30 * time.Second
+		if buffer >= ttl {
+			buffer = ttl / 2
+		}
+		h.auth.expiresAt = time.Now().UTC().Add(ttl - buffer)
+	}
 	return nil
 }
 
@@ -129,6 +140,24 @@ func (h *HCPClient) WithAddress(host string) error {
 
 func (h *HCPClient) getToken() string {
 	return h.auth.bearerToken
+}
+
+// ensureValidToken refreshes the AppRole token if it has expired or is about to.
+// Static bearer token auth (no roleID/secretID) is unmanaged and returned as-is.
+func (h *HCPClient) ensureValidToken(ctx context.Context) error {
+	if h.auth.roleID == "" || h.auth.secretID == "" {
+		return nil
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	// expiresAt zero means no TTL (e.g. root token) — treat as non-expiring.
+	if h.auth.bearerToken != "" && (h.auth.expiresAt.IsZero() || time.Now().UTC().Before(h.auth.expiresAt)) {
+		return nil
+	}
+
+	return h.appRoleLogin(ctx)
 }
 
 func isValidUrl(baseUrl string) bool {
@@ -170,7 +199,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	if hcp.auth.roleID != "" && hcp.auth.secretID != "" {
-		if err := hcp.AppRoleLogin(ctx); err != nil {
+		if err := hcp.appRoleLogin(ctx); err != nil {
 			return nil, err
 		}
 	}
@@ -457,6 +486,11 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		resp *http.Response
 		err  error
 	)
+
+	if err = h.ensureValidToken(ctx); err != nil {
+		return err
+	}
+
 	urlAddress, err := url.Parse(endpointUrl)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to parse request URL %q: %w", endpointUrl, err)
