@@ -81,7 +81,7 @@ func (h *HCPClient) IsConfigured() bool {
 	return h.auth.bearerToken != "" || (h.auth.roleID != "" && h.auth.secretID != "")
 }
 
-func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
+func (h *HCPClient) appRoleLogin(ctx context.Context) error {
 	loginURL, err := url.JoinPath(h.baseUrl, AppRoleLoginEndpoint)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to build approle login URL: %w", err)
@@ -119,7 +119,12 @@ func (h *HCPClient) AppRoleLogin(ctx context.Context) error {
 
 	h.auth.bearerToken = res.Auth.ClientToken
 	if res.Auth.LeaseDuration > 0 {
-		h.auth.expiresAt = time.Now().UTC().Add(time.Duration(res.Auth.LeaseDuration)*time.Second - 30*time.Second)
+		ttl := time.Duration(res.Auth.LeaseDuration) * time.Second
+		buffer := 30 * time.Second
+		if buffer >= ttl {
+			buffer = ttl / 2
+		}
+		h.auth.expiresAt = time.Now().UTC().Add(ttl - buffer)
 	}
 	return nil
 }
@@ -147,11 +152,12 @@ func (h *HCPClient) ensureValidToken(ctx context.Context) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if h.auth.bearerToken != "" && time.Now().UTC().Before(h.auth.expiresAt) {
+	// expiresAt zero means no TTL (e.g. root token) — treat as non-expiring.
+	if h.auth.bearerToken != "" && (h.auth.expiresAt.IsZero() || time.Now().UTC().Before(h.auth.expiresAt)) {
 		return nil
 	}
 
-	return h.AppRoleLogin(ctx)
+	return h.appRoleLogin(ctx)
 }
 
 func isValidUrl(baseUrl string) bool {
@@ -193,7 +199,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	if hcp.auth.roleID != "" && hcp.auth.secretID != "" {
-		if err := hcp.AppRoleLogin(ctx); err != nil {
+		if err := hcp.appRoleLogin(ctx); err != nil {
 			return nil, err
 		}
 	}
