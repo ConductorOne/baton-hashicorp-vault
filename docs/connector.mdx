@@ -208,7 +208,7 @@ spec:
     spec:
       containers:
       - name: baton-hashicorp-vault
-        image: ghcr.io/conductorone/baton-hashicorp-vault:latest
+        image: public.ecr.aws/conductorone/baton-hashicorp-vault:latest
         imagePullPolicy: IfNotPresent
         env:
         - name: BATON_HOST_ID
@@ -232,10 +232,3 @@ Check that the connector data uploaded correctly. In C1, click **Apps**. On the 
 Your HashiCorp Vault connector is now pulling access data into C1.
 </Tab>
 </Tabs>
-
-
-
-
-
-
-
