@@ -48,10 +48,11 @@ const (
 var listEndpoints = []string{KvEndpoint, SecEndpoint}
 
 type HCPClient struct {
-	httpClient *uhttp.BaseHttpClient
-	auth       *auth
-	baseUrl    string
-	mu         sync.Mutex
+	httpClient         *uhttp.BaseHttpClient
+	auth               *auth
+	baseUrl            string
+	mu                 sync.Mutex
+	skipMountBootstrap bool
 }
 
 type CustomErr struct {
@@ -75,6 +76,10 @@ func (h *HCPClient) WithBearerToken(apiToken string) {
 func (h *HCPClient) WithAppRole(roleID, secretID string) {
 	h.auth.roleID = roleID
 	h.auth.secretID = secretID
+}
+
+func (h *HCPClient) WithSkipMountBootstrap(skip bool) {
+	h.skipMountBootstrap = skip
 }
 
 func (h *HCPClient) IsConfigured() bool {
@@ -189,8 +194,9 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	hcp := HCPClient{
-		httpClient: cli,
-		baseUrl:    baseUrl,
+		httpClient:         cli,
+		baseUrl:            baseUrl,
+		skipMountBootstrap: hcpClient.skipMountBootstrap,
 		auth: &auth{
 			bearerToken: clientToken,
 			roleID:      hcpClient.auth.roleID,
@@ -204,87 +210,69 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 		}
 	}
 
-	err = enableStores(ctx, &hcp)
-	if err != nil {
-		return nil, err
+	if !hcp.skipMountBootstrap {
+		err = enableStores(ctx, &hcp)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &hcp, nil
 }
 
 func enableStores(ctx context.Context, hcpClient *HCPClient) error {
-	isAuthError, err := hcpClient.CheckAuthenticationMethod(ctx, ApproleAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
-				Type: approleType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, ApproleAuthEndpoint, BodyEnableAuth{Type: approleType}); err != nil {
+		return err
 	}
 
-	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, UserAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
-				Type: userpassType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, UserAuthEndpoint, BodyEnableAuth{Type: userpassType}); err != nil {
+		return err
 	}
 
-	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, KvAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
-				Type: kvType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, KvAuthEndpoint, BodySecret{Type: kvType}); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) (bool, error) {
+// ensureMount checks whether a mount exists at path, and creates it with body
+// if Vault reports it's not mounted (400 Bad Request). Any other error -
+// e.g. a 403 from a token that lacks sudo capability - is a genuine failure
+// and is returned rather than silently ignored.
+func ensureMount(ctx context.Context, hcpClient *HCPClient, path string, body any) error {
+	err := hcpClient.CheckAuthenticationMethod(ctx, path)
+	if err == nil {
+		return nil
+	}
+
+	if !strings.Contains(err.Error(), StatusBadRequest) {
+		return fmt.Errorf("baton-hashicorp-vault: failed to check mount %q: %w", path, err)
+	}
+
+	if err := hcpClient.EnableAuthMethod(ctx, path, body); err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to enable mount %q: %w", path, err)
+	}
+
+	return nil
+}
+
+func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) error {
 	authUrl, err := url.JoinPath(h.baseUrl, authMethod)
 	if err != nil {
-		return false, fmt.Errorf("baton-hashicorp-vault: failed to build URL for auth method %q: %w", authMethod, err)
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for auth method %q: %w", authMethod, err)
 	}
 
 	uri, err := url.Parse(authUrl)
 	if err != nil {
-		return false, fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
 	}
 
-	err = h.getAPIData(ctx,
+	return h.getAPIData(ctx,
 		http.MethodGet,
 		uri,
 		nil,
 	)
-	if err != nil {
-		return true, err
-	}
-
-	return false, nil
 }
 
 func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {

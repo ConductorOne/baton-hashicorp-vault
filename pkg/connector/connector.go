@@ -64,6 +64,8 @@ func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) 
 		hcpClient.WithAppRole(config.RoleId, config.SecretId)
 	}
 
+	hcpClient.WithSkipMountBootstrap(config.SkipMountBootstrap)
+
 	if hcpClient.IsConfigured() {
 		hcpClient, err = client.New(ctx, hcpClient)
 		if err != nil {

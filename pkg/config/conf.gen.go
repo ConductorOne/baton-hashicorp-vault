@@ -8,6 +8,7 @@ type HashicorpVault struct {
 	VaultHost string `mapstructure:"vault-host"`
 	RoleId string `mapstructure:"role-id"`
 	SecretId string `mapstructure:"secret-id"`
+	SkipMountBootstrap bool `mapstructure:"skip-mount-bootstrap"`
 }
 
 func (c *HashicorpVault) findFieldByTag(tagValue string) (any, bool) {

@@ -28,6 +28,13 @@ var (
 		field.WithDescription("Vault address or Host. Ex. http://127.0.0.1:8200"),
 		field.WithRequired(true),
 	)
+	SkipMountBootstrapField = field.BoolField(
+		"skip-mount-bootstrap",
+		field.WithDisplayName("Skip mount bootstrap"),
+		field.WithDescription("Skip checking and auto-enabling the approle, userpass, and kv Vault mounts on startup. "+
+			"Enable this when using a read-only Vault token or when the mounts are already configured, since "+
+			"enabling a mount requires sudo capability."),
+	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
 		// Must use either vault-token or role-id (not both, not neither)
@@ -43,6 +50,7 @@ var (
 		VaultHostField,
 		RoleIDField,
 		SecretIDField,
+		SkipMountBootstrapField,
 	}
 )
 
