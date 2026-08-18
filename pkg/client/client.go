@@ -15,6 +15,9 @@ import (
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ErrNotFound is returned when Vault responds with 404. For LIST operations
@@ -246,15 +249,30 @@ func ensureMount(ctx context.Context, hcpClient *HCPClient, path string, body an
 		return nil
 	}
 
-	if !strings.Contains(err.Error(), StatusBadRequest) {
-		return fmt.Errorf("baton-hashicorp-vault: failed to check mount %q: %w", path, err)
+	// Vault reports a missing mount as a plain 400, or as a 404 if the check
+	// short-circuits to ErrNotFound. Either way, attempt to create it.
+	if strings.Contains(err.Error(), StatusBadRequest) || errors.Is(err, ErrNotFound) {
+		if err := hcpClient.EnableAuthMethod(ctx, path, body); err != nil {
+			return fmt.Errorf("baton-hashicorp-vault: failed to enable mount %q: %w", path, err)
+		}
+		return nil
 	}
 
-	if err := hcpClient.EnableAuthMethod(ctx, path, body); err != nil {
-		return fmt.Errorf("baton-hashicorp-vault: failed to enable mount %q: %w", path, err)
+	// Checking (and creating) a mount requires sudo capability in Vault. A
+	// least-privilege, sync-only token will always get 401/403 here even when
+	// the mount already exists and everything else works fine - this is
+	// customer config, not a connector bug, so we warn and assume the mount
+	// is already configured rather than failing the whole connector startup.
+	if code := status.Code(err); code == codes.PermissionDenied || code == codes.Unauthenticated {
+		ctxzap.Extract(ctx).Warn(
+			"baton-hashicorp-vault: unable to verify mount is enabled, assuming it is already configured",
+			zap.String("path", path),
+			zap.Error(err),
+		)
+		return nil
 	}
 
-	return nil
+	return fmt.Errorf("baton-hashicorp-vault: failed to check mount %q: %w", path, err)
 }
 
 func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) error {

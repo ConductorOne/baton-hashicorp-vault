@@ -110,6 +110,7 @@ Flags:
       --log-level string       The log level: debug, info, warn, error ($BATON_LOG_LEVEL) (default "info")
   -p, --provisioning           This must be set in order for provisioning actions to be enabled ($BATON_PROVISIONING)
       --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
+      --skip-mount-bootstrap   Skip checking and auto-enabling the approle, userpass, and kv Vault mounts on startup. A token without permission to check/enable mounts logs a warning and continues rather than failing; set this to skip the check outright ($BATON_SKIP_MOUNT_BOOTSTRAP)
       --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
       --vault-host string      required: Vault address or Host. Ex. http://127.0.0.1:8200 ($BATON_VAULT_HOST)
       --vault-token string     Vault token for direct authentication. Mutually exclusive with --role-id ($BATON_VAULT_TOKEN)

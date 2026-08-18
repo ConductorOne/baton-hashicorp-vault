@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -113,13 +114,41 @@ func TestListAllAuthenticationMethods_404_ReturnsError(t *testing.T) {
 }
 
 // Mount bootstrap: client.New() checks the approle/userpass/kv mounts and
-// enables any that are missing. A token without sudo capability gets a 403
-// on the check itself; that must fail loudly rather than be swallowed.
+// enables any that are missing. Checking (and creating) a mount requires
+// sudo capability in Vault, so a least-privilege sync-only token always gets
+// 401/403 here - that's customer config, not a connector bug, and must not
+// block startup. A genuine server error must still fail loudly.
 
-func TestNew_MountCheckForbidden_ReturnsError(t *testing.T) {
+func TestNew_MountCheckPermissionDenied_WarnsAndContinues(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				switch r.URL.Path {
+				case "/" + client.ApproleAuthEndpoint, "/" + client.UserAuthEndpoint, "/" + client.KvAuthEndpoint:
+					w.WriteHeader(status)
+				default:
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{}`))
+				}
+			})
+			srv := httptest.NewServer(handler)
+			t.Cleanup(srv.Close)
+
+			hcpClient := client.NewClient()
+			hcpClient.WithBearerToken("test-token")
+			require.NoError(t, hcpClient.WithAddress(srv.URL))
+
+			_, err := client.New(context.Background(), hcpClient)
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestNew_MountCheckServerError_ReturnsError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/"+client.ApproleAuthEndpoint {
-			w.WriteHeader(http.StatusForbidden)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -138,40 +167,69 @@ func TestNew_MountCheckForbidden_ReturnsError(t *testing.T) {
 }
 
 func TestNew_MountAbsent_CreatesMount(t *testing.T) {
-	var created bool
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.Method == http.MethodGet && r.URL.Path == "/"+client.ApproleAuthEndpoint && !created:
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`{"errors":["No auth engine at approle/"]}`))
-		case r.Method == http.MethodPost && r.URL.Path == "/"+client.ApproleAuthEndpoint:
-			created = true
-			w.WriteHeader(http.StatusNoContent)
-		default:
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte(`{}`))
+	statusCases := []struct {
+		name         string
+		absentStatus int
+		absentBody   string
+		contentType  string
+	}{
+		{
+			name:         "400 reports mount not mounted",
+			absentStatus: http.StatusBadRequest,
+			absentBody:   `{"errors":["No auth engine at approle/"]}`,
+			contentType:  "application/json",
+		},
+		{
+			name:         "404 short-circuits to ErrNotFound",
+			absentStatus: http.StatusNotFound,
+		},
+	}
+	paths := []string{client.ApproleAuthEndpoint, client.UserAuthEndpoint, client.KvAuthEndpoint}
+
+	for _, tt := range statusCases {
+		for _, path := range paths {
+			t.Run(tt.name+"/"+path, func(t *testing.T) {
+				var created atomic.Bool
+				handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					switch {
+					case r.Method == http.MethodGet && r.URL.Path == "/"+path && !created.Load():
+						if tt.contentType != "" {
+							w.Header().Set("Content-Type", tt.contentType)
+						}
+						w.WriteHeader(tt.absentStatus)
+						if tt.absentBody != "" {
+							_, _ = w.Write([]byte(tt.absentBody))
+						}
+					case r.Method == http.MethodPost && r.URL.Path == "/"+path:
+						created.Store(true)
+						w.WriteHeader(http.StatusNoContent)
+					default:
+						w.Header().Set("Content-Type", "application/json")
+						w.WriteHeader(http.StatusOK)
+						_, _ = w.Write([]byte(`{}`))
+					}
+				})
+				srv := httptest.NewServer(handler)
+				t.Cleanup(srv.Close)
+
+				hcpClient := client.NewClient()
+				hcpClient.WithBearerToken("test-token")
+				require.NoError(t, hcpClient.WithAddress(srv.URL))
+
+				_, err := client.New(context.Background(), hcpClient)
+				require.NoError(t, err)
+				require.True(t, created.Load(), "expected EnableAuthMethod to POST to the missing mount at %q", path)
+			})
 		}
-	})
-	srv := httptest.NewServer(handler)
-	t.Cleanup(srv.Close)
-
-	hcpClient := client.NewClient()
-	hcpClient.WithBearerToken("test-token")
-	require.NoError(t, hcpClient.WithAddress(srv.URL))
-
-	_, err := client.New(context.Background(), hcpClient)
-	require.NoError(t, err)
-	require.True(t, created, "expected EnableAuthMethod to POST to the missing approle mount")
+	}
 }
 
 func TestNew_SkipMountBootstrap_SkipsChecks(t *testing.T) {
-	var sysCalled bool
+	var sysCalled atomic.Bool
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/" + client.ApproleAuthEndpoint, "/" + client.UserAuthEndpoint, "/" + client.KvAuthEndpoint:
-			sysCalled = true
+			sysCalled.Store(true)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
@@ -187,5 +245,5 @@ func TestNew_SkipMountBootstrap_SkipsChecks(t *testing.T) {
 
 	_, err := client.New(context.Background(), hcpClient)
 	require.NoError(t, err)
-	require.False(t, sysCalled, "expected no mount-bootstrap requests when skip flag is set")
+	require.False(t, sysCalled.Load(), "expected no mount-bootstrap requests when skip flag is set")
 }
