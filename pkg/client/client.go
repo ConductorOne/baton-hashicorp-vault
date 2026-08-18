@@ -27,25 +27,26 @@ import (
 var ErrNotFound = errors.New("baton-hashicorp-vault: resource not found")
 
 const (
-	AuthHeaderName       = "X-Vault-Token"
-	DefaultAddress       = "http://127.0.0.1:8200"
-	UsersEndpoint        = "v1/auth/userpass/users"
-	RolesEndpoint        = "v1/auth/approle/role"
-	KvEndpoint           = "v1/kv"
-	SecEndpoint          = "v1/secret/metadata"
-	AuthMethodsEndpoint  = "v1/sys/auth"
-	GroupsEndpoint       = "v1/identity/group/id"
-	EntityEndpoint       = "v1/identity/entity/id"
-	policiesEndpoint     = "v1/sys/policy"
-	ApproleAuthEndpoint  = "v1/sys/auth/approle"
-	UserAuthEndpoint     = "v1/sys/auth/userpass"
-	KvAuthEndpoint       = "v1/sys/mounts/kv"
-	AppRoleLoginEndpoint = "v1/auth/approle/login"
-	MethodList           = "LIST"
-	approleType          = "approle"
-	userpassType         = "userpass"
-	kvType               = "kv"
-	StatusBadRequest     = "400 Bad Request"
+	AuthHeaderName          = "X-Vault-Token"
+	DefaultAddress          = "http://127.0.0.1:8200"
+	UsersEndpoint           = "v1/auth/userpass/users"
+	RolesEndpoint           = "v1/auth/approle/role"
+	KvEndpoint              = "v1/kv"
+	SecEndpoint             = "v1/secret/metadata"
+	AuthMethodsEndpoint     = "v1/sys/auth"
+	GroupsEndpoint          = "v1/identity/group/id"
+	EntityEndpoint          = "v1/identity/entity/id"
+	policiesEndpoint        = "v1/sys/policy"
+	ApproleAuthEndpoint     = "v1/sys/auth/approle"
+	UserAuthEndpoint        = "v1/sys/auth/userpass"
+	KvAuthEndpoint          = "v1/sys/mounts/kv"
+	AppRoleLoginEndpoint    = "v1/auth/approle/login"
+	TokenLookupSelfEndpoint = "v1/auth/token/lookup-self"
+	MethodList              = "LIST"
+	approleType             = "approle"
+	userpassType            = "userpass"
+	kvType                  = "kv"
+	StatusBadRequest        = "400 Bad Request"
 )
 
 var listEndpoints = []string{KvEndpoint, SecEndpoint}
@@ -239,10 +240,6 @@ func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 	return nil
 }
 
-// ensureMount checks whether a mount exists at path, and creates it with body
-// if Vault reports it's not mounted (400 Bad Request). Any other error -
-// e.g. a 403 from a token that lacks sudo capability - is a genuine failure
-// and is returned rather than silently ignored.
 // ensureMount checks whether a mount exists at path and creates it if not.
 // There are three outcomes:
 //   - Vault reports the mount missing (400 Bad Request, or a 404 that
@@ -293,6 +290,30 @@ func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod st
 	uri, err := url.Parse(authUrl)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
+	}
+
+	return h.getAPIData(ctx,
+		http.MethodGet,
+		uri,
+		nil,
+	)
+}
+
+// LookupSelfToken exercises the current bearer token against Vault's
+// lookup-self endpoint, which any valid token can call regardless of policy.
+// Vault returns 403 for both an under-scoped token AND an invalid/expired
+// one, so the mount-bootstrap check alone can't distinguish "this token
+// works but lacks sudo" from "this token doesn't work at all" - this gives a
+// definitive, capability-independent answer for credential validation.
+func (h *HCPClient) LookupSelfToken(ctx context.Context) error {
+	endpointUrl, err := url.JoinPath(h.baseUrl, TokenLookupSelfEndpoint)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for token lookup-self: %w", err)
+	}
+
+	uri, err := url.Parse(endpointUrl)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse URL for token lookup-self: %w", err)
 	}
 
 	return h.getAPIData(ctx,

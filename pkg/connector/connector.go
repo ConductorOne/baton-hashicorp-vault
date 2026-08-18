@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -46,6 +47,10 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	if err := d.client.LookupSelfToken(ctx); err != nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: invalid Vault credentials: %w", err)
+	}
+
 	return nil, nil
 }
 

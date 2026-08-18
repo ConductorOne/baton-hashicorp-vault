@@ -113,6 +113,48 @@ func TestListAllAuthenticationMethods_404_ReturnsError(t *testing.T) {
 	require.Nil(t, result)
 }
 
+// LookupSelfToken: unlike the mount-bootstrap check, this must give a
+// definitive answer on credential validity regardless of policy capability,
+// since Vault's lookup-self endpoint works for any authenticated token.
+
+func TestLookupSelfToken_ValidToken_ReturnsNoError(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{}`))
+	})
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+
+	hcpClient := client.NewClient()
+	hcpClient.WithBearerToken("test-token")
+	hcpClient.WithSkipMountBootstrap(true)
+	require.NoError(t, hcpClient.WithAddress(srv.URL))
+
+	cli, err := client.New(context.Background(), hcpClient)
+	require.NoError(t, err)
+
+	require.NoError(t, cli.LookupSelfToken(context.Background()))
+}
+
+func TestLookupSelfToken_InvalidToken_ReturnsError(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+	})
+	srv := httptest.NewServer(handler)
+	t.Cleanup(srv.Close)
+
+	hcpClient := client.NewClient()
+	hcpClient.WithBearerToken("bad-token")
+	hcpClient.WithSkipMountBootstrap(true)
+	require.NoError(t, hcpClient.WithAddress(srv.URL))
+
+	cli, err := client.New(context.Background(), hcpClient)
+	require.NoError(t, err)
+
+	require.Error(t, cli.LookupSelfToken(context.Background()))
+}
+
 // Mount bootstrap: client.New() checks the approle/userpass/kv mounts and
 // enables any that are missing. Checking (and creating) a mount requires
 // sudo capability in Vault, so a least-privilege sync-only token always gets
