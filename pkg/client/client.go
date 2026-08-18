@@ -41,7 +41,7 @@ const (
 	UserAuthEndpoint        = "v1/sys/auth/userpass"
 	KvAuthEndpoint          = "v1/sys/mounts/kv"
 	AppRoleLoginEndpoint    = "v1/auth/approle/login"
-	TokenLookupSelfEndpoint = "v1/auth/token/lookup-self"
+	LookupSelfEndpoint = "v1/auth/token/lookup-self"
 	MethodList              = "LIST"
 	approleType             = "approle"
 	userpassType            = "userpass"
@@ -306,7 +306,7 @@ func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod st
 // works but lacks sudo" from "this token doesn't work at all" - this gives a
 // definitive, capability-independent answer for credential validation.
 func (h *HCPClient) LookupSelfToken(ctx context.Context) error {
-	endpointUrl, err := url.JoinPath(h.baseUrl, TokenLookupSelfEndpoint)
+	endpointUrl, err := url.JoinPath(h.baseUrl, LookupSelfEndpoint)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for token lookup-self: %w", err)
 	}

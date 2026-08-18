@@ -119,6 +119,10 @@ func TestListAllAuthenticationMethods_404_ReturnsError(t *testing.T) {
 
 func TestLookupSelfToken_ValidToken_ReturnsNoError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/"+client.LookupSelfEndpoint {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{}`))
@@ -139,6 +143,10 @@ func TestLookupSelfToken_ValidToken_ReturnsNoError(t *testing.T) {
 
 func TestLookupSelfToken_InvalidToken_ReturnsError(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet || r.URL.Path != "/"+client.LookupSelfEndpoint {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
 		w.WriteHeader(http.StatusForbidden)
 	})
 	srv := httptest.NewServer(handler)

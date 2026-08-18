@@ -71,11 +71,13 @@ func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) 
 
 	hcpClient.WithSkipMountBootstrap(config.SkipMountBootstrap)
 
-	if hcpClient.IsConfigured() {
-		hcpClient, err = client.New(ctx, hcpClient)
-		if err != nil {
-			return nil, nil, err
-		}
+	if !hcpClient.IsConfigured() {
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: no Vault credentials configured")
+	}
+
+	hcpClient, err = client.New(ctx, hcpClient)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return &Connector{
