@@ -243,14 +243,24 @@ func enableStores(ctx context.Context, hcpClient *HCPClient) error {
 // if Vault reports it's not mounted (400 Bad Request). Any other error -
 // e.g. a 403 from a token that lacks sudo capability - is a genuine failure
 // and is returned rather than silently ignored.
+// ensureMount checks whether a mount exists at path and creates it if not.
+// There are three outcomes:
+//   - Vault reports the mount missing (400 Bad Request, or a 404 that
+//     short-circuits to ErrNotFound): attempt to create it.
+//   - 403 (PermissionDenied): warn and assume the mount is already
+//     configured, rather than blocking connector startup - see below.
+//   - Anything else, including 401 (Unauthenticated - the token itself is
+//     invalid, not just under-scoped) and 429/5xx: a genuine failure,
+//     returned as-is. uhttp maps 429, 502, 503, and every other 5xx to the
+//     same codes.Unavailable, so there's no reliable way to special-case
+//     "transient" upstream failures here without also silently swallowing a
+//     genuine Vault outage or internal error - keep those loud.
 func ensureMount(ctx context.Context, hcpClient *HCPClient, path string, body any) error {
 	err := hcpClient.CheckAuthenticationMethod(ctx, path)
 	if err == nil {
 		return nil
 	}
 
-	// Vault reports a missing mount as a plain 400, or as a 404 if the check
-	// short-circuits to ErrNotFound. Either way, attempt to create it.
 	if strings.Contains(err.Error(), StatusBadRequest) || errors.Is(err, ErrNotFound) {
 		if err := hcpClient.EnableAuthMethod(ctx, path, body); err != nil {
 			return fmt.Errorf("baton-hashicorp-vault: failed to enable mount %q: %w", path, err)
@@ -258,12 +268,11 @@ func ensureMount(ctx context.Context, hcpClient *HCPClient, path string, body an
 		return nil
 	}
 
-	// Checking (and creating) a mount requires sudo capability in Vault. A
-	// least-privilege, sync-only token will always get 401/403 here even when
-	// the mount already exists and everything else works fine - this is
-	// customer config, not a connector bug, so we warn and assume the mount
-	// is already configured rather than failing the whole connector startup.
-	if code := status.Code(err); code == codes.PermissionDenied || code == codes.Unauthenticated {
+	// Checking (and creating) a mount requires sudo capability in Vault, so a
+	// least-privilege, sync-only token will always get 403 here even when the
+	// mount already exists and everything else works fine - that's customer
+	// config, not a connector bug.
+	if status.Code(err) == codes.PermissionDenied {
 		ctxzap.Extract(ctx).Warn(
 			"baton-hashicorp-vault: unable to verify mount is enabled, assuming it is already configured",
 			zap.String("path", path),

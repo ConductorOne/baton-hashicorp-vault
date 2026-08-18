@@ -32,8 +32,8 @@ var (
 		"skip-mount-bootstrap",
 		field.WithDisplayName("Skip mount bootstrap"),
 		field.WithDescription("Skip checking and auto-enabling the approle, userpass, and kv Vault mounts on startup. "+
-			"Enable this when using a read-only Vault token or when the mounts are already configured, since "+
-			"enabling a mount requires sudo capability."),
+			"A token without permission to check/enable mounts logs a warning and continues rather than failing; "+
+			"set this to skip the check outright."),
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{

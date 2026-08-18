@@ -116,44 +116,21 @@ func TestListAllAuthenticationMethods_404_ReturnsError(t *testing.T) {
 // Mount bootstrap: client.New() checks the approle/userpass/kv mounts and
 // enables any that are missing. Checking (and creating) a mount requires
 // sudo capability in Vault, so a least-privilege sync-only token always gets
-// 401/403 here - that's customer config, not a connector bug, and must not
-// block startup. A genuine server error must still fail loudly.
+// 403 here - that's customer config, not a connector bug, and must not
+// block startup. 401 (bad credentials), 429, and 5xx must still fail loudly:
+// uhttp maps 429/502/503/other-5xx all to the same codes.Unavailable, so
+// there's no way to safely treat only some of those as transient.
 
-func TestNew_MountCheckPermissionDenied_WarnsAndContinues(t *testing.T) {
-	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden} {
-		t.Run(http.StatusText(status), func(t *testing.T) {
-			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				switch r.URL.Path {
-				case "/" + client.ApproleAuthEndpoint, "/" + client.UserAuthEndpoint, "/" + client.KvAuthEndpoint:
-					w.WriteHeader(status)
-				default:
-					w.Header().Set("Content-Type", "application/json")
-					w.WriteHeader(http.StatusOK)
-					_, _ = w.Write([]byte(`{}`))
-				}
-			})
-			srv := httptest.NewServer(handler)
-			t.Cleanup(srv.Close)
-
-			hcpClient := client.NewClient()
-			hcpClient.WithBearerToken("test-token")
-			require.NoError(t, hcpClient.WithAddress(srv.URL))
-
-			_, err := client.New(context.Background(), hcpClient)
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestNew_MountCheckServerError_ReturnsError(t *testing.T) {
+func TestNew_MountCheckForbidden_WarnsAndContinues(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/"+client.ApproleAuthEndpoint {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
+		switch r.URL.Path {
+		case "/" + client.ApproleAuthEndpoint, "/" + client.UserAuthEndpoint, "/" + client.KvAuthEndpoint:
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			_, _ = w.Write([]byte(`{}`))
 		}
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{}`))
 	})
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
@@ -163,7 +140,35 @@ func TestNew_MountCheckServerError_ReturnsError(t *testing.T) {
 	require.NoError(t, hcpClient.WithAddress(srv.URL))
 
 	_, err := client.New(context.Background(), hcpClient)
-	require.Error(t, err)
+	require.NoError(t, err)
+}
+
+func TestNew_MountCheckReturnsError(t *testing.T) {
+	// These must all remain fatal: 401 means the token itself is invalid
+	// (worth failing fast on), and 429/500 exercise uhttp's coarse 5xx
+	// mapping that this connector deliberately does not special-case.
+	for _, status := range []int{http.StatusUnauthorized, http.StatusTooManyRequests, http.StatusInternalServerError} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/"+client.ApproleAuthEndpoint {
+					w.WriteHeader(status)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(`{}`))
+			})
+			srv := httptest.NewServer(handler)
+			t.Cleanup(srv.Close)
+
+			hcpClient := client.NewClient()
+			hcpClient.WithBearerToken("test-token")
+			require.NoError(t, hcpClient.WithAddress(srv.URL))
+
+			_, err := client.New(context.Background(), hcpClient)
+			require.Error(t, err)
+		})
+	}
 }
 
 func TestNew_MountAbsent_CreatesMount(t *testing.T) {
