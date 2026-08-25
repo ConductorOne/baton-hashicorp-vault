@@ -15,6 +15,9 @@ import (
 
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ErrNotFound is returned when Vault responds with 404. For LIST operations
@@ -38,6 +41,7 @@ const (
 	UserAuthEndpoint     = "v1/sys/auth/userpass"
 	KvAuthEndpoint       = "v1/sys/mounts/kv"
 	AppRoleLoginEndpoint = "v1/auth/approle/login"
+	LookupSelfEndpoint   = "v1/auth/token/lookup-self"
 	MethodList           = "LIST"
 	approleType          = "approle"
 	userpassType         = "userpass"
@@ -48,10 +52,11 @@ const (
 var listEndpoints = []string{KvEndpoint, SecEndpoint}
 
 type HCPClient struct {
-	httpClient *uhttp.BaseHttpClient
-	auth       *auth
-	baseUrl    string
-	mu         sync.Mutex
+	httpClient         *uhttp.BaseHttpClient
+	auth               *auth
+	baseUrl            string
+	mu                 sync.Mutex
+	skipMountBootstrap bool
 }
 
 type CustomErr struct {
@@ -75,6 +80,10 @@ func (h *HCPClient) WithBearerToken(apiToken string) {
 func (h *HCPClient) WithAppRole(roleID, secretID string) {
 	h.auth.roleID = roleID
 	h.auth.secretID = secretID
+}
+
+func (h *HCPClient) WithSkipMountBootstrap(skip bool) {
+	h.skipMountBootstrap = skip
 }
 
 func (h *HCPClient) IsConfigured() bool {
@@ -189,8 +198,9 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	}
 
 	hcp := HCPClient{
-		httpClient: cli,
-		baseUrl:    baseUrl,
+		httpClient:         cli,
+		baseUrl:            baseUrl,
+		skipMountBootstrap: hcpClient.skipMountBootstrap,
 		auth: &auth{
 			bearerToken: clientToken,
 			roleID:      hcpClient.auth.roleID,
@@ -204,87 +214,113 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 		}
 	}
 
-	err = enableStores(ctx, &hcp)
-	if err != nil {
-		return nil, err
+	if !hcp.skipMountBootstrap {
+		err = enableStores(ctx, &hcp)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &hcp, nil
 }
 
 func enableStores(ctx context.Context, hcpClient *HCPClient) error {
-	isAuthError, err := hcpClient.CheckAuthenticationMethod(ctx, ApproleAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, ApproleAuthEndpoint, BodyEnableAuth{
-				Type: approleType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, ApproleAuthEndpoint, BodyEnableAuth{Type: approleType}); err != nil {
+		return err
 	}
 
-	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, UserAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, UserAuthEndpoint, BodyEnableAuth{
-				Type: userpassType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, UserAuthEndpoint, BodyEnableAuth{Type: userpassType}); err != nil {
+		return err
 	}
 
-	isAuthError, err = hcpClient.CheckAuthenticationMethod(ctx, KvAuthEndpoint)
-	if err != nil {
-		if isAuthError && strings.Contains(err.Error(), StatusBadRequest) {
-			err = hcpClient.EnableAuthMethod(ctx, KvAuthEndpoint, BodySecret{
-				Type: kvType,
-			})
-			if err != nil {
-				return err
-			}
-		}
-
-		if !isAuthError {
-			return err
-		}
+	if err := ensureMount(ctx, hcpClient, KvAuthEndpoint, BodySecret{Type: kvType}); err != nil {
+		return err
 	}
 
 	return nil
 }
 
-func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) (bool, error) {
+// ensureMount checks whether a mount exists at path and creates it if not.
+// There are three outcomes:
+//   - Vault reports the mount missing (400 Bad Request, or a 404 that
+//     short-circuits to ErrNotFound): attempt to create it.
+//   - 403 (PermissionDenied): warn and assume the mount is already
+//     configured, rather than blocking connector startup - see below.
+//   - Anything else, including 401 (Unauthenticated - the token itself is
+//     invalid, not just under-scoped) and 429/5xx: a genuine failure,
+//     returned as-is. uhttp maps 429, 502, 503, and every other 5xx to the
+//     same codes.Unavailable, so there's no reliable way to special-case
+//     "transient" upstream failures here without also silently swallowing a
+//     genuine Vault outage or internal error - keep those loud.
+func ensureMount(ctx context.Context, hcpClient *HCPClient, path string, body any) error {
+	err := hcpClient.CheckAuthenticationMethod(ctx, path)
+	if err == nil {
+		return nil
+	}
+
+	if strings.Contains(err.Error(), StatusBadRequest) || errors.Is(err, ErrNotFound) {
+		if err := hcpClient.EnableAuthMethod(ctx, path, body); err != nil {
+			return fmt.Errorf("baton-hashicorp-vault: failed to enable mount %q: %w", path, err)
+		}
+		return nil
+	}
+
+	// Checking (and creating) a mount requires sudo capability in Vault, so a
+	// least-privilege, sync-only token will always get 403 here even when the
+	// mount already exists and everything else works fine - that's customer
+	// config, not a connector bug.
+	if status.Code(err) == codes.PermissionDenied {
+		ctxzap.Extract(ctx).Warn(
+			"baton-hashicorp-vault: unable to verify mount is enabled, assuming it is already configured",
+			zap.String("path", path),
+			zap.Error(err),
+		)
+		return nil
+	}
+
+	return fmt.Errorf("baton-hashicorp-vault: failed to check mount %q: %w", path, err)
+}
+
+func (h *HCPClient) CheckAuthenticationMethod(ctx context.Context, authMethod string) error {
 	authUrl, err := url.JoinPath(h.baseUrl, authMethod)
 	if err != nil {
-		return false, fmt.Errorf("baton-hashicorp-vault: failed to build URL for auth method %q: %w", authMethod, err)
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for auth method %q: %w", authMethod, err)
 	}
 
 	uri, err := url.Parse(authUrl)
 	if err != nil {
-		return false, fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse URL for auth method %q: %w", authMethod, err)
 	}
 
-	err = h.getAPIData(ctx,
+	return h.getAPIData(ctx,
 		http.MethodGet,
 		uri,
 		nil,
 	)
+}
+
+// LookupSelfToken exercises the current bearer token against Vault's
+// lookup-self endpoint, which any valid token can call regardless of policy.
+// Vault returns 403 for both an under-scoped token AND an invalid/expired
+// one, so the mount-bootstrap check alone can't distinguish "this token
+// works but lacks sudo" from "this token doesn't work at all" - this gives a
+// definitive, capability-independent answer for credential validation.
+func (h *HCPClient) LookupSelfToken(ctx context.Context) error {
+	endpointUrl, err := url.JoinPath(h.baseUrl, LookupSelfEndpoint)
 	if err != nil {
-		return true, err
+		return fmt.Errorf("baton-hashicorp-vault: failed to build URL for token lookup-self: %w", err)
 	}
 
-	return false, nil
+	uri, err := url.Parse(endpointUrl)
+	if err != nil {
+		return fmt.Errorf("baton-hashicorp-vault: failed to parse URL for token lookup-self: %w", err)
+	}
+
+	return h.getAPIData(ctx,
+		http.MethodGet,
+		uri,
+		nil,
+	)
 }
 
 func (h *HCPClient) ListAllUsers(ctx context.Context) (*CommonAPIData, string, error) {

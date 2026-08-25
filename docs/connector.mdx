@@ -65,6 +65,20 @@ vault write auth/approle/role/baton-connector \
     token_ttl=1h \
     token_max_ttl=4h
 ```
+
+By default, the connector checks whether the `approle`, `userpass`, and `kv` auth/secret
+mounts are enabled at startup, and enables any that are missing. Checking and enabling a
+mount both require `sudo` capability in Vault. If `<your-policy>` doesn't grant `sudo` on
+`sys/auth/*` and `sys/mounts/kv`, the check logs a warning and the connector continues,
+assuming the mounts are already configured — sync and provisioning aren't affected as
+long as the mounts genuinely exist. Set `BATON_SKIP_MOUNT_BOOTSTRAP=true` to skip this
+check outright.
+
+The connector also validates its credentials at the start of every sync by reading
+`auth/token/lookup-self`, which requires the token to retain Vault's built-in `default`
+policy (or an equivalent `read` grant on that path). If the role is created with
+`token_no_default_policy=true` or `<your-policy>` otherwise excludes `default`, add
+explicit `read` access to `auth/token/lookup-self` so credential validation succeeds.
 </Step>
 <Step>
 Retrieve the **Role ID** for the role you just created:

@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -46,6 +47,10 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 // Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
 // to be sure that they are valid.
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	if err := d.client.LookupSelfToken(ctx); err != nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: invalid Vault credentials: %w", err)
+	}
+
 	return nil, nil
 }
 
@@ -64,11 +69,15 @@ func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) 
 		hcpClient.WithAppRole(config.RoleId, config.SecretId)
 	}
 
-	if hcpClient.IsConfigured() {
-		hcpClient, err = client.New(ctx, hcpClient)
-		if err != nil {
-			return nil, nil, err
-		}
+	hcpClient.WithSkipMountBootstrap(config.SkipMountBootstrap)
+
+	if !hcpClient.IsConfigured() {
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: no Vault credentials configured")
+	}
+
+	hcpClient, err = client.New(ctx, hcpClient)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return &Connector{
