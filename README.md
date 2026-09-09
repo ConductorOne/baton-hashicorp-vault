@@ -32,13 +32,13 @@ baton resources
 
 Using a Vault Token:
 ```
-docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_VAULT_TOKEN=<token> public.ecr.aws/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
 Using AppRole:
 ```
-docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_ROLE_ID=<role-id> -e BATON_SECRET_ID=<secret-id> ghcr.io/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
+docker run --rm -v $(pwd):/out -e BATON_VAULT_HOST=<host> -e BATON_ROLE_ID=<role-id> -e BATON_SECRET_ID=<secret-id> public.ecr.aws/conductorone/baton-hashicorp-vault:latest -f "/out/sync.c1z"
 docker run --rm -v $(pwd):/out ghcr.io/conductorone/baton:latest -f "/out/sync.c1z" resources
 ```
 
