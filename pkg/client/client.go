@@ -25,6 +25,7 @@ var ErrNotFound = errors.New("baton-hashicorp-vault: resource not found")
 
 const (
 	AuthHeaderName       = "X-Vault-Token"
+	NamespaceHeaderName  = "X-Vault-Namespace"
 	DefaultAddress       = "http://127.0.0.1:8200"
 	UsersEndpoint        = "v1/auth/userpass/users"
 	RolesEndpoint        = "v1/auth/approle/role"
@@ -51,6 +52,7 @@ type HCPClient struct {
 	httpClient *uhttp.BaseHttpClient
 	auth       *auth
 	baseUrl    string
+	namespace  string
 	mu         sync.Mutex
 }
 
@@ -77,6 +79,11 @@ func (h *HCPClient) WithAppRole(roleID, secretID string) {
 	h.auth.secretID = secretID
 }
 
+// WithNamespace sets the Vault Enterprise or HCP Vault namespace to send with requests.
+func (h *HCPClient) WithNamespace(ns string) {
+	h.namespace = strings.Trim(ns, "/")
+}
+
 func (h *HCPClient) IsConfigured() bool {
 	return h.auth.bearerToken != "" || (h.auth.roleID != "" && h.auth.secretID != "")
 }
@@ -95,10 +102,10 @@ func (h *HCPClient) appRoleLogin(ctx context.Context) error {
 	req, err := h.httpClient.NewRequest(ctx,
 		http.MethodPost,
 		uri,
-		uhttp.WithJSONBody(appRoleLoginRequest{
+		h.requestOptions("", appRoleLoginRequest{
 			RoleID:   h.auth.roleID,
 			SecretID: h.auth.secretID,
-		}),
+		})...,
 	)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to create approle login request: %w", err)
@@ -139,14 +146,16 @@ func (h *HCPClient) WithAddress(host string) error {
 }
 
 func (h *HCPClient) getToken() string {
+	h.mu.Lock()
+	defer h.mu.Unlock()
 	return h.auth.bearerToken
 }
 
 // ensureValidToken refreshes the AppRole token if it has expired or is about to.
 // Static bearer token auth (no roleID/secretID) is unmanaged and returned as-is.
-func (h *HCPClient) ensureValidToken(ctx context.Context) error {
+func (h *HCPClient) ensureValidToken(ctx context.Context) (string, error) {
 	if h.auth.roleID == "" || h.auth.secretID == "" {
-		return nil
+		return h.getToken(), nil
 	}
 
 	h.mu.Lock()
@@ -154,10 +163,28 @@ func (h *HCPClient) ensureValidToken(ctx context.Context) error {
 
 	// expiresAt zero means no TTL (e.g. root token) — treat as non-expiring.
 	if h.auth.bearerToken != "" && (h.auth.expiresAt.IsZero() || time.Now().UTC().Before(h.auth.expiresAt)) {
-		return nil
+		return h.auth.bearerToken, nil
 	}
 
-	return h.appRoleLogin(ctx)
+	if err := h.appRoleLogin(ctx); err != nil {
+		return "", err
+	}
+	return h.auth.bearerToken, nil
+}
+
+func (h *HCPClient) requestOptions(token string, body any) []uhttp.RequestOption {
+	options := make([]uhttp.RequestOption, 0, 4)
+	if h.namespace != "" {
+		options = append(options, uhttp.WithHeader(NamespaceHeaderName, h.namespace))
+	}
+	if token != "" {
+		options = append(options, uhttp.WithHeader(AuthHeaderName, token))
+	}
+	options = append(options, uhttp.WithAcceptJSONHeader())
+	if body != nil {
+		options = append(options, uhttp.WithJSONBody(body))
+	}
+	return options
 }
 
 func isValidUrl(baseUrl string) bool {
@@ -174,8 +201,13 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	if err != nil {
 		return nil, fmt.Errorf("baton-hashicorp-vault: failed to create HTTP client: %w", err)
 	}
+	httpClient.CheckRedirect = func(*http.Request, []*http.Request) error {
+		return http.ErrUseLastResponse
+	}
 
-	cli, err := uhttp.NewBaseHttpClientWithContext(context.Background(), httpClient)
+	cli, err := uhttp.NewBaseHttpClientWithContext(ctx, httpClient,
+		uhttp.WithCacheKeyHeaders(NamespaceHeaderName, AuthHeaderName),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("baton-hashicorp-vault: failed to initialize HTTP client: %w", err)
 	}
@@ -191,6 +223,7 @@ func New(ctx context.Context, hcpClient *HCPClient) (*HCPClient, error) {
 	hcp := HCPClient{
 		httpClient: cli,
 		baseUrl:    baseUrl,
+		namespace:  hcpClient.namespace,
 		auth: &auth{
 			bearerToken: clientToken,
 			roleID:      hcpClient.auth.roleID,
@@ -487,7 +520,8 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		err  error
 	)
 
-	if err = h.ensureValidToken(ctx); err != nil {
+	token, err := h.ensureValidToken(ctx)
+	if err != nil {
 		return err
 	}
 
@@ -499,8 +533,7 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	req, err := h.httpClient.NewRequest(ctx,
 		method,
 		urlAddress,
-		uhttp.WithHeader(AuthHeaderName, h.getToken()),
-		uhttp.WithJSONBody(body),
+		h.requestOptions(token, body)...,
 	)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to create %s request for %s: %w", method, endpointUrl, err)
@@ -517,6 +550,8 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 		if resp != nil {
 			defer resp.Body.Close()
 		}
+	default:
+		return fmt.Errorf("baton-hashicorp-vault: unsupported HTTP method %q", method)
 	}
 
 	if resp != nil && resp.StatusCode == http.StatusNotFound {

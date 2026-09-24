@@ -167,6 +167,11 @@ stringData:
   # HashiCorp Vault host (required)
   BATON_VAULT_HOST: <HashiCorp Vault address or host, such as http://127.0.0.1:8200>
 
+  # Vault Enterprise or HCP Vault Dedicated namespace (optional). Sent as the
+  # X-Vault-Namespace header on every request. HCP requires one; its top-level
+  # namespace is admin, so use admin or admin/<child>.
+  # BATON_VAULT_NAMESPACE: admin/<child>
+
   # Authentication — use one of the following two options, not both:
 
   # Option 1: Vault Token
