@@ -20,6 +20,14 @@ The connector supports two authentication methods — use one or the other, not 
 - **Vault Token**: provide a `--vault-token` directly.
 - **AppRole**: provide both `--role-id` and `--secret-id`. The connector will exchange them for a token via the [AppRole auth method](https://developer.hashicorp.com/vault/docs/auth/approle).
 
+### Namespaces (Vault Enterprise and HCP Vault Dedicated)
+
+Pass `--vault-namespace` (or `BATON_VAULT_NAMESPACE`) to target a namespace. The connector sends it as the `X-Vault-Namespace` header on every request, including the AppRole login. HCP Vault Dedicated always needs one, and its top-level namespace is `admin`, so the value is usually `admin` or `admin/<child>`. The policy and the AppRole have to live in that same namespace.
+
+### Required Vault policy
+
+The connector is read-only. It lists secret key names and never reads secret data. The minimal policy is in [docs/connector.mdx](./docs/connector.mdx), with a commented copy in [docs/baton-connector-read.hcl](./docs/baton-connector-read.hcl). Before every sync the connector checks its token with `auth/token/lookup-self`, then asks `sys/capabilities-self` which of the paths it needs are readable. Each missing capability gets one warning naming the path and the namespace. The affected resource type syncs as empty and the rest of the sync goes ahead.
+
 ## brew
 
 ```
@@ -112,6 +120,7 @@ Flags:
       --skip-full-sync         This must be set to skip a full sync ($BATON_SKIP_FULL_SYNC)
       --ticketing              This must be set to enable ticketing support ($BATON_TICKETING)
       --vault-host string      required: Vault address or Host. Ex. http://127.0.0.1:8200 ($BATON_VAULT_HOST)
+      --vault-namespace string Vault Enterprise or HCP Vault namespace to target, for example admin/<child>. Sent as the X-Vault-Namespace header on every request. Leave empty for the root namespace. ($BATON_VAULT_NAMESPACE)
       --vault-token string     Vault token for direct authentication. Mutually exclusive with --role-id ($BATON_VAULT_TOKEN)
       --role-id string         AppRole role ID for Vault AppRole authentication. Mutually exclusive with --vault-token ($BATON_ROLE_ID)
       --secret-id string       AppRole secret ID for Vault AppRole authentication. Required when --role-id is set ($BATON_SECRET_ID)
