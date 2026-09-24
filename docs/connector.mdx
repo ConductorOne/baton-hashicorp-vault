@@ -15,7 +15,7 @@ sidebarTitle: "HashiCorp Vault"
 | Entities | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |  |
 | Groups | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |  |
 | Policies | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
-| Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |
+| Roles | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> | |
 | Secrets | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |  |
 
 ## Gather HashiCorp Vault credentials 
@@ -57,11 +57,51 @@ vault auth enable approle
 ```
 </Step>
 <Step>
-Create an AppRole role with the appropriate policies for the connector:
+Create a read-only policy for the connector. It lists secret key names only and never reads secret data. If you run Vault Enterprise or HCP Vault Dedicated, create the policy and the AppRole in the namespace the connector will target (for HCP the top-level namespace is `admin`), for example with `-namespace=admin/<child>`.
+
+```hcl
+# baton-connector-read: read-only governance policy for the ConductorOne connector.
+
+# Token self-inspection used by connector validation (also granted by the default policy)
+path "auth/token/lookup-self"  { capabilities = ["read"] }
+path "sys/capabilities-self"   { capabilities = ["update"] }
+
+# Policies: either endpoint is enough; the connector tries sys/policies/acl first
+path "sys/policies/acl"        { capabilities = ["list"] }
+path "sys/policy"              { capabilities = ["read"] }
+
+# Auth methods and secret engines
+path "sys/auth"                { capabilities = ["read"] }
+path "sys/mounts"              { capabilities = ["read"] }
+
+# Identity entities (whatever authenticated: machines, service accounts, IdP logins)
+# and groups (external groups mirror IdP groups such as Okta groups and carry policies)
+path "identity/entity/id"      { capabilities = ["list"] }
+path "identity/entity/id/*"    { capabilities = ["read"] }
+path "identity/group/id"       { capabilities = ["list"] }
+path "identity/group/id/*"     { capabilities = ["read"] }
+
+# Auth-backend role definitions on every mount (oidc, jwt, aws, kubernetes, approle, ...)
+path "auth/+/role"             { capabilities = ["list"] }
+path "auth/+/role/*"           { capabilities = ["read"] }
+
+# Secret key names, one block per KV mount the connector should enumerate.
+# KV v2 mounts list under <mount>/metadata; KV v1 mounts list under <mount>.
+path "kv/metadata/*"           { capabilities = ["list"] }
+```
+
+```bash
+vault policy write baton-connector-read baton-connector-read.hcl
+```
+
+The same policy with a comment on every rule, plus the optional `userpass` and provisioning blocks, is checked in as [docs/baton-connector-read.hcl](https://github.com/ConductorOne/baton-hashicorp-vault/blob/main/docs/baton-connector-read.hcl). The connector discovers KV mounts through `sys/mounts` and lists every one it can. A mount the token cannot list is skipped with a warning. If the `userpass` auth method is mounted and its accounts should be synced, add `list` on `auth/userpass/users` and `read` on `auth/userpass/users/*`. Assigning policies from ConductorOne also needs `update` on `auth/userpass/users/*`. Leave it out unless you enable provisioning.
+</Step>
+<Step>
+Create an AppRole role that carries that policy:
 
 ```bash
 vault write auth/approle/role/baton-connector \
-    token_policies="<your-policy>" \
+    token_policies="baton-connector-read" \
     token_ttl=1h \
     token_max_ttl=4h
 ```
@@ -165,7 +205,7 @@ stringData:
   BATON_CLIENT_SECRET: <C1 client secret>
 
   # HashiCorp Vault host (required)
-  BATON_VAULT_HOST: <HashiCorp Vault address or host, such as http://127.0.0.1:8200>
+  BATON_VAULT_HOST: <HashiCorp Vault address or host, such as https://vault.example.com:8200>
 
   # Vault Enterprise or HCP Vault Dedicated namespace (optional). Sent as the
   # X-Vault-Namespace header on every request. HCP requires one; its top-level
@@ -232,5 +272,9 @@ Check that the connector data uploaded correctly. In C1, click **Apps**. On the 
 </Steps>
 
 Your HashiCorp Vault connector is now pulling access data into C1.
+
+### What the connector logs when access is incomplete
+
+Before every sync the connector checks its token with `auth/token/lookup-self`. An invalid or expired token fails validation and the sync stops there. Otherwise it asks `sys/capabilities-self` which of the paths above the token can read, and logs one warning per resource type it cannot, naming the path, the missing capability and the namespace. Those resource types sync as empty instead of failing the run, so you get a partial sync while the policy is being fixed. A path that is not mounted at all, such as `auth/userpass` in a namespace with no userpass auth method, is logged the same way and synced as empty.
 </Tab>
 </Tabs>

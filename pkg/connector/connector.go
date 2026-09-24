@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"fmt"
 	"io"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
@@ -11,6 +12,8 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
 	"github.com/conductorone/baton-sdk/pkg/uhttp"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type Connector struct {
@@ -44,9 +47,53 @@ func (d *Connector) Metadata(_ context.Context) (*v2.ConnectorMetadata, error) {
 	}, nil
 }
 
-// Validate is called to ensure that the connector is properly configured. It should exercise any API credentials
-// to be sure that they are valid.
+// Validate verifies the Vault token with lookup-self. Invalid credentials fail
+// validation; missing sync capabilities only produce warnings so partial syncs
+// remain possible.
 func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, error) {
+	tokenInfo, err := d.client.LookupSelf(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: invalid Vault credentials: %w", err)
+	}
+
+	logger := ctxzap.Extract(ctx)
+	logger.Info("baton-hashicorp-vault: validated Vault token",
+		zap.String("display_name", tokenInfo.DisplayName),
+		zap.Strings("policies", tokenInfo.Policies),
+		zap.String("namespace_path", tokenInfo.NamespacePath),
+		zap.Int("ttl", tokenInfo.TTL),
+		zap.Bool("renewable", tokenInfo.Renewable),
+	)
+
+	paths := make([]string, 0, len(requiredCapabilities))
+	for _, required := range requiredCapabilities {
+		paths = append(paths, required.path)
+	}
+	capabilities, err := d.client.CapabilitiesSelf(ctx, paths)
+	if err != nil {
+		logger.Warn("baton-hashicorp-vault: could not verify token capabilities; the sync will skip anything the token cannot read", zap.Error(err))
+		return nil, nil
+	}
+
+	namespace := d.client.Namespace()
+	if namespace == "" {
+		namespace = tokenInfo.NamespacePath
+	}
+	missing := missingCapabilities(capabilities)
+	for _, resourceType := range missing {
+		for _, required := range requiredCapabilities {
+			if required.resourceType != resourceType {
+				continue
+			}
+			logger.Warn("baton-hashicorp-vault: token lacks required capability; resource type will be synced as empty",
+				zap.String("path", required.path),
+				zap.String("missing_capability", required.capability),
+				zap.String("namespace", namespace),
+				zap.String("consequence", "the "+resourceType+" resource type will be synced as empty"),
+			)
+			break
+		}
+	}
 	return nil, nil
 }
 
@@ -60,22 +107,24 @@ func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) 
 	hcpClient := client.NewClient()
 	hcpClient.WithNamespace(config.VaultNamespace)
 
-	err := hcpClient.WithAddress(config.VaultHost)
-	if err != nil {
-		return nil, nil, err
-	}
-
 	if config.VaultToken != "" {
 		hcpClient.WithBearerToken(config.VaultToken)
 	} else {
 		hcpClient.WithAppRole(config.RoleId, config.SecretId)
 	}
 
-	if hcpClient.IsConfigured() {
-		hcpClient, err = client.New(ctx, hcpClient)
-		if err != nil {
-			return nil, nil, err
-		}
+	if !hcpClient.IsConfigured() {
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: no Vault credentials configured: set --vault-token or --role-id and --secret-id")
+	}
+
+	err := hcpClient.WithAddress(config.VaultHost)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	hcpClient, err = client.New(ctx, hcpClient)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	return &Connector{

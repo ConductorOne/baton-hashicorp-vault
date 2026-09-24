@@ -24,6 +24,10 @@ The connector supports two authentication methods — use one or the other, not 
 
 Pass `--vault-namespace` (or `BATON_VAULT_NAMESPACE`) to target a namespace. The connector sends it as the `X-Vault-Namespace` header on every request, including the AppRole login. HCP Vault Dedicated always needs one, and its top-level namespace is `admin`, so the value is usually `admin` or `admin/<child>`. The policy and the AppRole have to live in that same namespace.
 
+### Required Vault policy
+
+The connector is read-only. It lists secret key names and never reads secret data. The minimal policy is in [docs/connector.mdx](./docs/connector.mdx), with a commented copy in [docs/baton-connector-read.hcl](./docs/baton-connector-read.hcl). Before every sync the connector checks its token with `auth/token/lookup-self`, then asks `sys/capabilities-self` which of the paths it needs are readable. Each missing capability gets one warning naming the path and the namespace. The affected resource type syncs as empty and the rest of the sync goes ahead.
+
 ## brew
 
 ```

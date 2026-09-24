@@ -31,7 +31,8 @@ var (
 	VaultNamespaceField = field.StringField(
 		"vault-namespace",
 		field.WithDisplayName("Vault namespace"),
-		field.WithDescription("Vault Enterprise or HCP Vault namespace to target, for example admin/<child>. Sent as the X-Vault-Namespace header on every request. Leave empty for the root namespace."),
+		field.WithDescription("Vault Enterprise or HCP Vault namespace to target, for example admin/<child>. "+
+			"Sent as the X-Vault-Namespace header on every request. Leave empty for the root namespace."),
 	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
