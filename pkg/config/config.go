@@ -28,6 +28,11 @@ var (
 		field.WithDescription("Vault address or Host. Ex. http://127.0.0.1:8200"),
 		field.WithRequired(true),
 	)
+	VaultNamespaceField = field.StringField(
+		"vault-namespace",
+		field.WithDisplayName("Vault namespace"),
+		field.WithDescription("Vault Enterprise or HCP Vault namespace to target, for example admin/<child>. Sent as the X-Vault-Namespace header on every request. Leave empty for the root namespace."),
+	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
 		// Must use either vault-token or role-id (not both, not neither)
@@ -43,6 +48,7 @@ var (
 		VaultHostField,
 		RoleIDField,
 		SecretIDField,
+		VaultNamespaceField,
 	}
 )
 
