@@ -6,6 +6,8 @@ import (
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type entityBuilder struct {
@@ -30,6 +32,9 @@ func (e *entityBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 
 	entities, nextPageToken, err := e.client.ListAllEntities(ctx)
 	if err != nil {
+		if skippable(ctx, err, entityResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -38,16 +43,27 @@ func (e *entityBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		return nil, nil, err
 	}
 
-	for entityId, entity := range entities.Data.KeyInfo {
-		ur, err := entityResource(ctx, &client.APIResource{
-			ID:   entityId,
-			Name: entity.Name,
-		})
-		if err != nil {
-			return nil, nil, err
+	if len(entities.Data.KeyInfo) == 0 && len(entities.Data.Keys) > 0 {
+		ctxzap.Extract(ctx).Warn("baton-hashicorp-vault: key_info was absent; using keys", zap.String("resource_type", entityResourceType.Id))
+		for _, entityID := range entities.Data.Keys {
+			ur, err := entityResource(ctx, &client.APIResource{ID: entityID, Name: entityID})
+			if err != nil {
+				return nil, nil, err
+			}
+			rv = append(rv, ur)
 		}
+	} else {
+		for entityId, entity := range entities.Data.KeyInfo {
+			ur, err := entityResource(ctx, &client.APIResource{
+				ID:   entityId,
+				Name: entity.Name,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
 
-		rv = append(rv, ur)
+			rv = append(rv, ur)
+		}
 	}
 
 	nextPageToken, err = bag.Marshal()

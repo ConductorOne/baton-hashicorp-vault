@@ -6,6 +6,8 @@ import (
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 type groupBuilder struct {
@@ -30,6 +32,9 @@ func (g *groupBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId
 
 	groups, nextPageToken, err := g.client.ListAllGroups(ctx)
 	if err != nil {
+		if skippable(ctx, err, groupResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -38,15 +43,26 @@ func (g *groupBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId
 		return nil, nil, err
 	}
 
-	for groupId, group := range groups.Data.KeyInfo {
-		ur, err := groupResource(ctx, &client.APIResource{
-			ID:   groupId,
-			Name: group.Name,
-		})
-		if err != nil {
-			return nil, nil, err
+	if len(groups.Data.KeyInfo) == 0 && len(groups.Data.Keys) > 0 {
+		ctxzap.Extract(ctx).Warn("baton-hashicorp-vault: key_info was absent; using keys", zap.String("resource_type", groupResourceType.Id))
+		for _, groupID := range groups.Data.Keys {
+			ur, err := groupResource(ctx, &client.APIResource{ID: groupID, Name: groupID})
+			if err != nil {
+				return nil, nil, err
+			}
+			rv = append(rv, ur)
 		}
-		rv = append(rv, ur)
+	} else {
+		for groupId, group := range groups.Data.KeyInfo {
+			ur, err := groupResource(ctx, &client.APIResource{
+				ID:   groupId,
+				Name: group.Name,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			rv = append(rv, ur)
+		}
 	}
 
 	nextPageToken, err = bag.Marshal()

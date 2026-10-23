@@ -3,13 +3,15 @@ package connector
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rs "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
 
 func userResource(_ context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
@@ -21,6 +23,7 @@ func userResource(_ context.Context, user *client.APIResource, parentResourceID 
 	}
 
 	userTraits := []rs.UserTraitOption{
+		rs.WithUserLogin(user.Name),
 		rs.WithUserProfile(profile),
 		rs.WithStatus(userStatus),
 	}
@@ -88,6 +91,9 @@ func secretResource(_ context.Context, secret *client.APIResource) (*v2.Resource
 		"id":         secret.ID,
 		"name":       secret.Name,
 		"mount_type": secret.MountType,
+		"mount":      secret.Mount,
+		"kv_version": secret.KVVersion,
+		"path":       secret.Path,
 	}
 
 	policyTraitOptions := []rs.AppTraitOption{
@@ -224,7 +230,21 @@ func entityResource(_ context.Context, entity *client.APIResource) (*v2.Resource
 	return resource, nil
 }
 
-func removeTrailingSlash(strPath string) string {
-	regex := regexp.MustCompile(`/`)
-	return regex.ReplaceAllString(strPath, "")
+func skippable(ctx context.Context, err error, resourceType string) bool {
+	condition := ""
+	switch {
+	case client.IsPermissionDenied(err):
+		condition = "permission denied"
+	case client.IsNoRoute(err):
+		condition = "path not mounted"
+	default:
+		return false
+	}
+	ctxzap.Extract(ctx).Warn("baton-hashicorp-vault: skipping resource type: "+condition,
+		zap.String("resource_type", resourceType), zap.Error(err))
+	return true
+}
+
+func trimTrailingSlash(strPath string) string {
+	return strings.TrimSuffix(strPath, "/")
 }
