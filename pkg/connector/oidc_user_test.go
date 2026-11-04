@@ -59,7 +59,7 @@ func newVaultStub(t *testing.T) *client.HCPClient {
 
 func TestUserList_IncludesOIDCUsersWithEmail(t *testing.T) {
 	ctx := context.Background()
-	ub := newUserBuilder(newVaultStub(t))
+	ub := newUserBuilder(newVaultStub(t), true)
 
 	var all []*v2.Resource
 	token := ""
@@ -171,7 +171,7 @@ func TestUserList_PaginatesOIDCEntities(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
-	all := listAll(t, newUserBuilder(cli))
+	all := listAll(t, newUserBuilder(cli, true))
 	require.Len(t, all, 5)
 }
 
@@ -186,12 +186,29 @@ func TestUserList_SkipsEntityDeletedMidSync(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
-	all := listAll(t, newUserBuilder(cli))
+	all := listAll(t, newUserBuilder(cli, true))
 	require.Len(t, all, 1)
 	require.Equal(t, "here", all[0].Id.Resource)
 }
 
-func TestUserList_ForbiddenEntitiesKeepsUserpassUsers(t *testing.T) {
+func TestUserList_OIDCDisabledByDefault(t *testing.T) {
+	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/userpass/users":
+			fmt.Fprint(w, `{"data":{"keys":["dave"]}}`)
+		case strings.HasPrefix(r.URL.Path, "/v1/identity/"):
+			t.Errorf("identity API must not be called when sync-oidc-users is off: %s", r.URL.Path)
+			w.WriteHeader(http.StatusForbidden)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	all := listAll(t, newUserBuilder(cli, false))
+	require.Len(t, all, 1)
+	require.Equal(t, "dave", all[0].Id.Resource)
+}
+
+func TestUserList_ForbiddenEntitiesIsAnError(t *testing.T) {
 	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/v1/auth/userpass/users":
@@ -203,7 +220,9 @@ func TestUserList_ForbiddenEntitiesKeepsUserpassUsers(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	})
-	all := listAll(t, newUserBuilder(cli))
-	require.Len(t, all, 1)
-	require.Equal(t, "dave", all[0].Id.Resource)
+	ub := newUserBuilder(cli, true)
+	_, res, err := ub.List(context.Background(), nil, rsTypes.SyncOpAttrs{})
+	require.NoError(t, err)
+	_, _, err = ub.List(context.Background(), nil, rsTypes.SyncOpAttrs{PageToken: pagination.Token{Token: res.NextPageToken}})
+	require.Error(t, err)
 }

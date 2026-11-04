@@ -13,13 +13,12 @@ import (
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 )
 
 type userBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.HCPClient
+	syncOIDC     bool
 }
 
 func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -66,28 +65,29 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		rv = append(rv, ur)
 	}
 
-	if err := bag.Next(oidcPagePrefix); err != nil {
+	next := ""
+	if u.syncOIDC {
+		next = oidcPagePrefix
+	}
+	if err := bag.Next(next); err != nil {
 		return nil, nil, err
 	}
-	nextPageToken, err := bag.Marshal()
-	if err != nil {
-		return nil, nil, err
+	nextPageToken := ""
+	if next != "" {
+		if nextPageToken, err = bag.Marshal(); err != nil {
+			return nil, nil, err
+		}
 	}
 	return rv, &rsTypes.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
 // listOIDC emits up to oidcPageSize OIDC/JWT entities with ID greater than
-// afterID. Tokens that cannot read identity entities (HTTP 403) skip this
-// phase with a warning so existing userpass-only syncs keep working.
+// afterID. A 403 here is an error: the operator opted in to this phase.
 func (u *userBuilder) listOIDC(ctx context.Context, bag *pagination.Bag, afterID string) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
 	l := ctxzap.Extract(ctx)
 
 	list, err := u.client.ListEntitiesWithAliases(ctx)
 	if err != nil {
-		if status.Code(err) == codes.PermissionDenied {
-			l.Warn("baton-hashicorp-vault: token cannot list identity entities; skipping OIDC/JWT users. Grant list on identity/entity/id and read on identity/entity/id/* to sync them")
-			return u.finishOIDC(bag, nil, "")
-		}
 		return nil, nil, err
 	}
 
@@ -109,10 +109,6 @@ func (u *userBuilder) listOIDC(ctx context.Context, bag *pagination.Bag, afterID
 			if errors.Is(err, client.ErrNotFound) {
 				l.Debug("baton-hashicorp-vault: entity disappeared during sync, skipping", zap.String("entity_id", id))
 				continue
-			}
-			if status.Code(err) == codes.PermissionDenied {
-				l.Warn("baton-hashicorp-vault: token cannot read identity entities; skipping OIDC/JWT users")
-				return u.finishOIDC(bag, nil, "")
 			}
 			return nil, nil, err
 		}
@@ -153,9 +149,10 @@ func (u *userBuilder) Grants(_ context.Context, _ *v2.Resource, _ rsTypes.SyncOp
 	return nil, nil, nil
 }
 
-func newUserBuilder(c *client.HCPClient) *userBuilder {
+func newUserBuilder(c *client.HCPClient, syncOIDC bool) *userBuilder {
 	return &userBuilder{
 		resourceType: userResourceType,
 		client:       c,
+		syncOIDC:     syncOIDC,
 	}
 }

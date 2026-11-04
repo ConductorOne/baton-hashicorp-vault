@@ -763,7 +763,8 @@ func (h *HCPClient) ListEntitiesWithAliases(ctx context.Context) (*EntityListDat
 
 // GetEntity reads a single entity, including alias metadata populated by
 // OIDC/JWT claim_mappings (not returned by the list endpoint). It returns
-// ErrNotFound when the entity no longer exists. The request bypasses the uhttp
+// ErrNotFound when the entity no longer exists: Vault answers GET
+// identity/entity/id/:id with 404 for a missing entity and 403 for an ACL denial. The request bypasses the uhttp
 // GET cache so disabled state and email are never up to an hour stale.
 // https://developer.hashicorp.com/vault/api-docs/secret/identity/entity#read-entity-by-id
 func (h *HCPClient) GetEntity(ctx context.Context, id string) (*Entity, error) {

@@ -80,9 +80,9 @@ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --role-id '<role-id>'
 
 ### OIDC/JWT users and email
 
-Vault has no native email attribute. OIDC/JWT users are identity entities with an alias on the auth mount, and they are synced as `user` resources (resource ID = entity ID; sync-only, policy grants/revokes are supported for userpass users only). The connector reads the email from, in order: alias `metadata` (set by the OIDC role's `claim_mappings`, e.g. `{"email": "email"}`), alias `custom_metadata`, entity `metadata` (keys `email`, `email_address`, `mail`), then the alias name if it is a valid email address. If none apply the user is still synced without an email.
+Vault has no native email attribute. OIDC/JWT users are identity entities with an alias on the auth mount, and they are synced as `user` resources (resource ID = entity ID; sync-only, policy grants/revokes are supported for userpass users only). When enabled, the connector reads the email from, in order: alias `metadata` (set by the OIDC role's `claim_mappings`, e.g. `{"email": "email"}`), alias `custom_metadata`, entity `metadata` (keys `email`, `email_address`, `mail`), then the alias name if it is a valid email address. If none apply the user is still synced without an email.
 
-Syncing these users requires `list` on `identity/entity/id` and `read` on `identity/entity/id/*`. A token without that access skips OIDC/JWT users with a warning; userpass users still sync.
+This is opt-in: set `--sync-oidc-users` (`BATON_SYNC_OIDC_USERS=true`). It requires `list` on `identity/entity/id` and `read` on `identity/entity/id/*` in the token's policy; without that access the sync fails with a permission error.
 
 # Contributing, Support and Issues
 
@@ -121,6 +121,7 @@ Flags:
       --vault-token string     Vault token for direct authentication. Mutually exclusive with --role-id ($BATON_VAULT_TOKEN)
       --role-id string         AppRole role ID for Vault AppRole authentication. Mutually exclusive with --vault-token ($BATON_ROLE_ID)
       --secret-id string       AppRole secret ID for Vault AppRole authentication. Required when --role-id is set ($BATON_SECRET_ID)
+      --sync-oidc-users        Sync identity entities that sign in through an OIDC or JWT auth method as users. Requires list on identity/entity/id and read on identity/entity/id/* in the token's policy. ($BATON_SYNC_OIDC_USERS)
   -v, --version                version for baton-hashicorp-vault
 
 Use "baton-hashicorp-vault [command] --help" for more information about a command.
