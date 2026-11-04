@@ -10,7 +10,7 @@ import (
 
 // oidcPageSize bounds the per-page N+1 entity reads: the list endpoint omits
 // alias metadata, which is where OIDC claim_mappings store the email.
-const oidcPageSize = 100
+var oidcPageSize = 100
 
 // emailMetadataKeys are the metadata keys checked for an email, in order.
 // Vault has no native email attribute; the key is whatever the operator chose
@@ -73,6 +73,8 @@ func oidcEmail(e *client.Entity, aliases []client.EntityAlias) string {
 		if v := lookupEmail(a.Metadata); v != "" {
 			return v
 		}
+	}
+	for _, a := range aliases {
 		if v := lookupEmail(a.CustomMetadata); v != "" {
 			return v
 		}

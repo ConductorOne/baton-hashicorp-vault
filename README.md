@@ -80,7 +80,9 @@ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --role-id '<role-id>'
 
 ### OIDC/JWT users and email
 
-Vault has no native email attribute. OIDC/JWT users are identity entities with an alias on the auth mount. The connector reads the email, in order, from: alias `metadata` (set by the OIDC role's `claim_mappings`, e.g. `{"email": "email"}`), alias `custom_metadata`, entity `metadata` (keys `email`, `email_address`, `mail`), then the alias name if the role's `user_claim` is `email`. If none apply the user is still synced without an email. The token needs `read` on `identity/entity/id/*` and `list` on `identity/entity/id`.
+Vault has no native email attribute. OIDC/JWT users are identity entities with an alias on the auth mount, and they are synced as `user` resources (resource ID = entity ID; sync-only, policy grants/revokes are supported for userpass users only). The connector reads the email from, in order: alias `metadata` (set by the OIDC role's `claim_mappings`, e.g. `{"email": "email"}`), alias `custom_metadata`, entity `metadata` (keys `email`, `email_address`, `mail`), then the alias name if it is a valid email address. If none apply the user is still synced without an email.
+
+Syncing these users requires `list` on `identity/entity/id` and `read` on `identity/entity/id/*`. A token without that access skips OIDC/JWT users with a warning; userpass users still sync.
 
 # Contributing, Support and Issues
 
