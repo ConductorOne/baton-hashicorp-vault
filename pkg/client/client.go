@@ -735,3 +735,47 @@ func (h *HCPClient) UpdateUserPolicy(ctx context.Context, policy []string, name 
 
 	return nil
 }
+
+// ListEntitiesWithAliases lists identity entities including their aliases.
+// https://developer.hashicorp.com/vault/api-docs/secret/identity/entity#list-entities-by-id
+func (h *HCPClient) ListEntitiesWithAliases(ctx context.Context) (*EntityListData, error) {
+	entityUrl, err := url.JoinPath(h.baseUrl, EntityEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build entities URL: %w", err)
+	}
+
+	var res *entityListAPIData
+	if err := h.doRequest(ctx, MethodList, entityUrl, &res, nil); err != nil {
+		// Vault returns 404 on LIST when there are no entities.
+		if errors.Is(err, ErrNotFound) {
+			return &EntityListData{}, nil
+		}
+		return nil, err
+	}
+	if res == nil {
+		return &EntityListData{}, nil
+	}
+
+	return &res.Data, nil
+}
+
+// GetEntity reads a single entity, including alias metadata populated by
+// OIDC/JWT claim_mappings (not returned by the list endpoint).
+// https://developer.hashicorp.com/vault/api-docs/secret/identity/entity#read-entity-by-id
+func (h *HCPClient) GetEntity(ctx context.Context, id string) (*Entity, error) {
+	entityUrl, err := url.JoinPath(h.baseUrl, EntityEndpoint, id)
+	if err != nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: failed to build URL for entity %q: %w", id, err)
+	}
+
+	var res *entityReadAPIData
+	if err := h.doRequest(ctx, http.MethodGet, entityUrl, &res, nil); err != nil {
+		return nil, err
+	}
+	if res == nil {
+		return nil, fmt.Errorf("baton-hashicorp-vault: empty response reading entity %q", id)
+	}
+	res.Data.ID = id
+
+	return &res.Data, nil
+}

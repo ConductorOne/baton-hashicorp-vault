@@ -71,12 +71,16 @@ baton-hashicorp-vault --vault-host 'http://127.0.0.1:8200' --role-id '<role-id>'
 # Data Model
 
 `baton-hashicorp-vault` will pull down information about the following resources:
-- Users
+- Users (userpass users, plus identity entities that log in through an OIDC/JWT auth mount)
 - Groups
 - Roles
 - Entities
 - Policies
 - Secrets
+
+### OIDC/JWT users and email
+
+Vault has no native email attribute. OIDC/JWT users are identity entities with an alias on the auth mount. The connector reads the email, in order, from: alias `metadata` (set by the OIDC role's `claim_mappings`, e.g. `{"email": "email"}`), alias `custom_metadata`, entity `metadata` (keys `email`, `email_address`, `mail`), then the alias name if the role's `user_claim` is `email`. If none apply the user is still synced without an email. The token needs `read` on `identity/entity/id/*` and `list` on `identity/entity/id`.
 
 # Contributing, Support and Issues
 
