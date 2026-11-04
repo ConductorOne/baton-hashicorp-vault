@@ -175,10 +175,10 @@ func TestUserList_PaginatesOIDCEntities(t *testing.T) {
 
 func TestUserList_SkipsEntityDeletedMidSync(t *testing.T) {
 	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
-		switch {
-		case r.URL.Path == "/v1/identity/entity/id":
+		switch r.URL.Path {
+		case "/v1/identity/entity/id":
 			fmt.Fprint(w, `{"data":{"key_info":{"gone":{"aliases":[{"name":"a","mount_type":"oidc"}]},"here":{"aliases":[{"name":"b","mount_type":"oidc"}]}}}}`)
-		case r.URL.Path == "/v1/identity/entity/id/here":
+		case "/v1/identity/entity/id/here":
 			fmt.Fprint(w, `{"data":{"name":"here","aliases":[{"name":"b","mount_type":"oidc"}]}}`)
 		default:
 			w.WriteHeader(http.StatusNotFound)
