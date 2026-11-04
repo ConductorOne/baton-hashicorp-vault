@@ -481,7 +481,7 @@ func getError(resp *http.Response) (CustomErr, error) {
 	return cErr, nil
 }
 
-func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}) error {
+func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, res interface{}, body interface{}, reqOpts ...uhttp.RequestOption) error {
 	var (
 		resp *http.Response
 		err  error
@@ -499,8 +499,10 @@ func (h *HCPClient) doRequest(ctx context.Context, method, endpointUrl string, r
 	req, err := h.httpClient.NewRequest(ctx,
 		method,
 		urlAddress,
-		uhttp.WithHeader(AuthHeaderName, h.getToken()),
-		uhttp.WithJSONBody(body),
+		append([]uhttp.RequestOption{
+			uhttp.WithHeader(AuthHeaderName, h.getToken()),
+			uhttp.WithJSONBody(body),
+		}, reqOpts...)...,
 	)
 	if err != nil {
 		return fmt.Errorf("baton-hashicorp-vault: failed to create %s request for %s: %w", method, endpointUrl, err)
@@ -753,14 +755,16 @@ func (h *HCPClient) ListEntitiesWithAliases(ctx context.Context) (*EntityListDat
 		return nil, err
 	}
 	if res == nil {
-		return &EntityListData{}, nil
+		return nil, fmt.Errorf("baton-hashicorp-vault: empty response listing entities")
 	}
 
 	return &res.Data, nil
 }
 
 // GetEntity reads a single entity, including alias metadata populated by
-// OIDC/JWT claim_mappings (not returned by the list endpoint).
+// OIDC/JWT claim_mappings (not returned by the list endpoint). It returns
+// ErrNotFound when the entity no longer exists. The request bypasses the uhttp
+// GET cache so disabled state and email are never up to an hour stale.
 // https://developer.hashicorp.com/vault/api-docs/secret/identity/entity#read-entity-by-id
 func (h *HCPClient) GetEntity(ctx context.Context, id string) (*Entity, error) {
 	entityUrl, err := url.JoinPath(h.baseUrl, EntityEndpoint, id)
@@ -769,7 +773,7 @@ func (h *HCPClient) GetEntity(ctx context.Context, id string) (*Entity, error) {
 	}
 
 	var res *entityReadAPIData
-	if err := h.doRequest(ctx, http.MethodGet, entityUrl, &res, nil); err != nil {
+	if err := h.doRequest(ctx, http.MethodGet, entityUrl, &res, nil, uhttp.WithNoCache()); err != nil {
 		return nil, err
 	}
 	if res == nil {

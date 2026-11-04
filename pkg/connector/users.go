@@ -4,13 +4,17 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
+	"sort"
 	"strings"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
 	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type userBuilder struct {
@@ -22,8 +26,9 @@ func (u *userBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 	return userResourceType
 }
 
-// oidcPagePrefix marks page tokens in the OIDC phase; the suffix is an offset
-// into the sorted list of OIDC entity IDs. An empty token is the userpass phase.
+// oidcPagePrefix marks page tokens in the OIDC phase; the suffix is the last
+// entity ID already emitted, so entities created or deleted between pages
+// cannot shift the cursor. An empty token is the userpass phase.
 const oidcPagePrefix = "oidc:"
 
 // List returns userpass users first, then Vault identity entities that logged
@@ -40,11 +45,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	token := bag.Current().Token
 	if strings.HasPrefix(token, oidcPagePrefix) {
-		offset, err := strconv.Atoi(strings.TrimPrefix(token, oidcPagePrefix))
-		if err != nil || offset < 0 {
-			return nil, nil, fmt.Errorf("baton-hashicorp-vault: invalid page token %q", token)
-		}
-		return u.listOIDC(ctx, bag, offset)
+		return u.listOIDC(ctx, bag, strings.TrimPrefix(token, oidcPagePrefix))
 	}
 
 	users, _, err := u.client.ListAllUsers(ctx)
@@ -65,7 +66,7 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 		rv = append(rv, ur)
 	}
 
-	if err := bag.Next(oidcPagePrefix + "0"); err != nil {
+	if err := bag.Next(oidcPagePrefix); err != nil {
 		return nil, nil, err
 	}
 	nextPageToken, err := bag.Marshal()
@@ -75,31 +76,43 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 	return rv, &rsTypes.SyncOpResults{NextPageToken: nextPageToken}, nil
 }
 
-func (u *userBuilder) listOIDC(ctx context.Context, bag *pagination.Bag, offset int) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
+// listOIDC emits up to oidcPageSize OIDC/JWT entities with ID greater than
+// afterID. Tokens that cannot read identity entities (HTTP 403) skip this
+// phase with a warning so existing userpass-only syncs keep working.
+func (u *userBuilder) listOIDC(ctx context.Context, bag *pagination.Bag, afterID string) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
+	l := ctxzap.Extract(ctx)
+
 	list, err := u.client.ListEntitiesWithAliases(ctx)
 	if err != nil {
+		if status.Code(err) == codes.PermissionDenied {
+			l.Warn("baton-hashicorp-vault: token cannot list identity entities; skipping OIDC/JWT users. Grant list on identity/entity/id and read on identity/entity/id/* to sync them")
+			return u.finishOIDC(bag, nil, "")
+		}
 		return nil, nil, err
 	}
 
 	ids := oidcEntityIDs(list)
-	end := offset + oidcPageSize
+	start := sort.Search(len(ids), func(i int) bool { return ids[i] > afterID })
+	end := start + oidcPageSize
 	next := ""
 	if end < len(ids) {
-		next = oidcPagePrefix + strconv.Itoa(end)
+		next = oidcPagePrefix + ids[end-1]
 	} else {
 		end = len(ids)
 	}
-	if offset > end {
-		offset = end
-	}
 
 	var rv []*v2.Resource
-	for _, id := range ids[offset:end] {
+	for _, id := range ids[start:end] {
 		entity, err := u.client.GetEntity(ctx, id)
 		if err != nil {
 			// The entity was deleted between the list and the read.
 			if errors.Is(err, client.ErrNotFound) {
+				l.Debug("baton-hashicorp-vault: entity disappeared during sync, skipping", zap.String("entity_id", id))
 				continue
+			}
+			if status.Code(err) == codes.PermissionDenied {
+				l.Warn("baton-hashicorp-vault: token cannot read identity entities; skipping OIDC/JWT users")
+				return u.finishOIDC(bag, nil, "")
 			}
 			return nil, nil, err
 		}
@@ -113,11 +126,16 @@ func (u *userBuilder) listOIDC(ctx context.Context, bag *pagination.Bag, offset 
 		}
 	}
 
+	return u.finishOIDC(bag, rv, next)
+}
+
+func (u *userBuilder) finishOIDC(bag *pagination.Bag, rv []*v2.Resource, next string) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
 	if err := bag.Next(next); err != nil {
 		return nil, nil, err
 	}
 	nextPageToken := ""
 	if next != "" {
+		var err error
 		if nextPageToken, err = bag.Marshal(); err != nil {
 			return nil, nil, err
 		}

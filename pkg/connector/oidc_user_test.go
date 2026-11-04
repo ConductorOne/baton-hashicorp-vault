@@ -115,3 +115,95 @@ func TestOIDCEmail_Precedence(t *testing.T) {
 	require.Equal(t, "bob@example.com", oidcEmail(&client.Entity{}, al))
 	require.Equal(t, "", oidcEmail(&client.Entity{Metadata: map[string]string{"email": "not-an-email"}}, []client.EntityAlias{{Name: "sub-1"}}))
 }
+
+// stubWith builds a client against a handler for tests needing custom behavior.
+func stubWith(t *testing.T, h http.HandlerFunc) *client.HCPClient {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		h(w, r)
+	}))
+	t.Cleanup(srv.Close)
+	c := client.NewClient()
+	c.WithBearerToken("t")
+	require.NoError(t, c.WithAddress(srv.URL))
+	cli, err := client.New(context.Background(), c)
+	require.NoError(t, err)
+	return cli
+}
+
+func listAll(t *testing.T, ub *userBuilder) []*v2.Resource {
+	t.Helper()
+	var all []*v2.Resource
+	token := ""
+	for i := 0; i < 50; i++ {
+		rs, res, err := ub.List(context.Background(), nil, rsTypes.SyncOpAttrs{PageToken: pagination.Token{Token: token}})
+		require.NoError(t, err)
+		all = append(all, rs...)
+		token = res.NextPageToken
+		if token == "" {
+			return all
+		}
+	}
+	t.Fatal("pagination did not terminate")
+	return nil
+}
+
+func TestUserList_PaginatesOIDCEntities(t *testing.T) {
+	old := oidcPageSize
+	oidcPageSize = 2
+	t.Cleanup(func() { oidcPageSize = old })
+
+	var keyInfo []string
+	for i := 0; i < 5; i++ {
+		keyInfo = append(keyInfo, fmt.Sprintf(`"e%d":{"name":"n%d","aliases":[{"name":"a%d","mount_type":"oidc"}]}`, i, i, i))
+	}
+	list := `{"data":{"key_info":{` + strings.Join(keyInfo, ",") + `}}}`
+	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/identity/entity/id":
+			fmt.Fprint(w, list)
+		case strings.HasPrefix(r.URL.Path, "/v1/identity/entity/id/"):
+			fmt.Fprint(w, `{"data":{"name":"n","aliases":[{"name":"a","mount_type":"oidc"}]}}`)
+		case r.URL.Path == "/v1/auth/userpass/users":
+			w.WriteHeader(http.StatusNotFound)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	all := listAll(t, newUserBuilder(cli))
+	require.Len(t, all, 5)
+}
+
+func TestUserList_SkipsEntityDeletedMidSync(t *testing.T) {
+	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/identity/entity/id":
+			fmt.Fprint(w, `{"data":{"key_info":{"gone":{"aliases":[{"name":"a","mount_type":"oidc"}]},"here":{"aliases":[{"name":"b","mount_type":"oidc"}]}}}}`)
+		case r.URL.Path == "/v1/identity/entity/id/here":
+			fmt.Fprint(w, `{"data":{"name":"here","aliases":[{"name":"b","mount_type":"oidc"}]}}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	all := listAll(t, newUserBuilder(cli))
+	require.Len(t, all, 1)
+	require.Equal(t, "here", all[0].Id.Resource)
+}
+
+func TestUserList_ForbiddenEntitiesKeepsUserpassUsers(t *testing.T) {
+	cli := stubWith(t, func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/v1/auth/userpass/users":
+			fmt.Fprint(w, `{"data":{"keys":["dave"]}}`)
+		case strings.HasPrefix(r.URL.Path, "/v1/identity/"):
+			w.WriteHeader(http.StatusForbidden)
+			fmt.Fprint(w, `{"errors":["permission denied"]}`)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+	all := listAll(t, newUserBuilder(cli))
+	require.Len(t, all, 1)
+	require.Equal(t, "dave", all[0].Id.Resource)
+}

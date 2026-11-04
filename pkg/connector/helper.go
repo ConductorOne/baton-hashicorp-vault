@@ -65,13 +65,16 @@ func oidcUserResource(entity *client.Entity) (*v2.Resource, error) {
 		"mount_path": aliases[0].MountPath,
 	}
 
+	if email != "" {
+		profile["email"] = email
+	}
+
 	traits := []rs.UserTraitOption{
 		rs.WithUserProfile(profile),
 		rs.WithStatus(status),
 		rs.WithUserLogin(login),
 	}
 	if email != "" {
-		profile["email"] = email
 		traits = append(traits, rs.WithEmail(email, true))
 	}
 
