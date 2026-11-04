@@ -96,9 +96,7 @@ func TestUserList_IncludesOIDCUsersWithEmail(t *testing.T) {
 	require.Equal(t, "bob@example.com", emailOf("e-jwt"))    // alias name is an email
 	require.Equal(t, "", emailOf("e-nometa"))                // no email: still synced
 
-	ut, err := rsTypes.GetUserTrait(byID["e-jwt"])
-	require.NoError(t, err)
-	require.Equal(t, v2.UserTrait_Status_STATUS_DISABLED, ut.Status.Status)
+	require.Equal(t, v2.Status_RESOURCE_STATUS_DISABLED, byID["e-jwt"].GetStatus().GetStatus())
 }
 
 func TestOIDCEmail_Precedence(t *testing.T) {

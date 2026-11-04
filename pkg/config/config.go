@@ -31,7 +31,7 @@ var (
 	SyncOIDCUsersField = field.BoolField(
 		"sync-oidc-users",
 		field.WithDisplayName("Sync OIDC/JWT users"),
-		field.WithDescription("Sync identity entities that sign in through an OIDC or JWT auth method as users. Requires list on identity/entity/id and read on identity/entity/id/* in the token's policy."),
+		field.WithDescription("Sync OIDC/JWT identity entities as users. Needs list on identity/entity/id and read on identity/entity/id/*."),
 		field.WithDefaultValue(false),
 	)
 
