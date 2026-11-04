@@ -2,6 +2,7 @@ package connector
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"slices"
 
@@ -14,6 +15,8 @@ import (
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
 	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
 	"go.uber.org/zap"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type policyBuilder struct {
@@ -144,6 +147,9 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 	policyId := entitlement.Resource.Id.Resource
 	userId := principal.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
+	if errors.Is(err, client.ErrNotFound) {
+		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy grants are only supported for userpass users (OIDC/JWT users are sync-only)", userId)
+	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy grant: %w", userId, err)
 	}
@@ -183,6 +189,9 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 	userId := principal.Id.Resource
 	policyId := entitlement.Resource.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
+	if errors.Is(err, client.ErrNotFound) {
+		return nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy revokes are only supported for userpass users (OIDC/JWT users are sync-only)", userId)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy revoke: %w", userId, err)
 	}
