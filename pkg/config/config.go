@@ -28,6 +28,12 @@ var (
 		field.WithDescription("Vault address or Host. Ex. http://127.0.0.1:8200"),
 		field.WithRequired(true),
 	)
+	SyncOIDCUsersField = field.BoolField(
+		"sync-oidc-users",
+		field.WithDisplayName("Sync OIDC/JWT users"),
+		field.WithDescription("Sync identity entities that sign in through an OIDC or JWT auth method as users. Requires list on identity/entity/id and read on identity/entity/id/* in the token's policy."),
+		field.WithDefaultValue(false),
+	)
 
 	FieldRelationships = []field.SchemaFieldRelationship{
 		// Must use either vault-token or role-id (not both, not neither)
@@ -43,6 +49,7 @@ var (
 		VaultHostField,
 		RoleIDField,
 		SecretIDField,
+		SyncOIDCUsersField,
 	}
 )
 

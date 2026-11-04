@@ -19,7 +19,7 @@ sidebarTitle: "HashiCorp Vault"
 | Secrets | <Icon icon="square-check" iconType="solid"  color="#c937ae"/> |  |
 
 <Note>
-Accounts include userpass users and identity entities that sign in through an OIDC or JWT auth method (synced with their email when Vault stores one in the alias metadata). OIDC/JWT accounts are sync-only. Syncing them requires `list` on `identity/entity/id` and `read` on `identity/entity/id/*`; without that access they are skipped and userpass accounts still sync.
+By default, accounts are userpass users. To also sync identity entities that sign in through an OIDC or JWT auth method, enable **Sync OIDC/JWT users**. Each account is synced with its email when Vault stores one in the alias metadata (for example via the OIDC role's `claim_mappings`). OIDC/JWT accounts are sync-only. The token's policy must allow `list` on `identity/entity/id` and `read` on `identity/entity/id/*`.
 </Note>
 
 ## Gather HashiCorp Vault credentials 
