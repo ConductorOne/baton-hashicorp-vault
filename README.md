@@ -121,7 +121,7 @@ Flags:
       --vault-token string     Vault token for direct authentication. Mutually exclusive with --role-id ($BATON_VAULT_TOKEN)
       --role-id string         AppRole role ID for Vault AppRole authentication. Mutually exclusive with --vault-token ($BATON_ROLE_ID)
       --secret-id string       AppRole secret ID for Vault AppRole authentication. Required when --role-id is set ($BATON_SECRET_ID)
-      --sync-oidc-users        Sync identity entities that sign in through an OIDC or JWT auth method as users. Requires list on identity/entity/id and read on identity/entity/id/* in the token's policy. ($BATON_SYNC_OIDC_USERS)
+      --sync-oidc-users        Sync OIDC/JWT identity entities as users. Needs list on identity/entity/id and read on identity/entity/id/*. ($BATON_SYNC_OIDC_USERS)
   -v, --version                version for baton-hashicorp-vault
 
 Use "baton-hashicorp-vault [command] --help" for more information about a command.
