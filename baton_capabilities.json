@@ -59,8 +59,7 @@
         "description": "Roles of Hashicorp Vault"
       },
       "capabilities": [
-        "CAPABILITY_SYNC",
-        "CAPABILITY_PROVISION"
+        "CAPABILITY_SYNC"
       ],
       "permissions": {}
     },

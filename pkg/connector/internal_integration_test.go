@@ -1,3 +1,5 @@
+//go:build integration
+
 package connector
 
 import (
@@ -16,6 +18,7 @@ import (
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	"github.com/conductorone/baton-sdk/pkg/types/grant"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -26,6 +29,12 @@ var (
 )
 
 func getClientForTesting(ctx context.Context, host string) (*client.HCPClient, error) {
+	if host == "" {
+		host = vaultHost
+	}
+	if host == "" {
+		host = client.DefaultAddress
+	}
 	hcpClient := client.NewClient()
 	hcpClient.WithBearerToken(vaultToken)
 	err := hcpClient.WithAddress(host)
@@ -42,11 +51,11 @@ func getClientForTesting(ctx context.Context, host string) (*client.HCPClient, e
 }
 
 func TestUsersBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	u := &userBuilder{
@@ -64,11 +73,11 @@ func TestUsersBuilderList(t *testing.T) {
 }
 
 func TestPolicyBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	p := &policyBuilder{
@@ -86,11 +95,11 @@ func TestPolicyBuilderList(t *testing.T) {
 }
 
 func TestRoleBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	r := &roleBuilder{
@@ -108,11 +117,11 @@ func TestRoleBuilderList(t *testing.T) {
 }
 
 func TestSecretsBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	s := &secretBuilder{
@@ -130,11 +139,11 @@ func TestSecretsBuilderList(t *testing.T) {
 }
 
 func TestAuthMethodsBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	a := &authMethodBuilder{
@@ -152,11 +161,11 @@ func TestAuthMethodsBuilderList(t *testing.T) {
 }
 
 func TestGroupsBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	g := &groupBuilder{
@@ -174,11 +183,11 @@ func TestGroupsBuilderList(t *testing.T) {
 }
 
 func TestEntitiesBuilderList(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	e := &entityBuilder{
@@ -230,11 +239,11 @@ func getPolicyForTesting(ctxTest context.Context, id string, name string) (*v2.R
 
 func TestPolicyGrant(t *testing.T) {
 	var roleEntitlement string
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	grantEntitlement := "policy:default:assigned"
@@ -263,7 +272,7 @@ func TestPolicyGrant(t *testing.T) {
 }
 
 func TestPolicyRevoke(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
@@ -271,7 +280,7 @@ func TestPolicyRevoke(t *testing.T) {
 	if len(revokeGrant) >= 1 && len(revokeGrant) <= 5 {
 		policyId := revokeGrant[1]
 		userId := revokeGrant[4]
-		cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+		cliTest, err := getClientForTesting(ctxTest, "")
 		require.Nil(t, err)
 
 		resource, err := getPolicyForTesting(ctxTest, policyId, policyId)
@@ -292,11 +301,11 @@ func TestPolicyRevoke(t *testing.T) {
 
 func TestAddUsers(t *testing.T) {
 	var count = 5
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	cli, err := client.New(context.Background(), cliTest)
@@ -308,8 +317,8 @@ func TestAddUsers(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			name := strings.ReplaceAll(mockdata.FULLNAMES[i], " ", "")
-			err := cli.AddUsers(context.Background(), name, "superSecretPassword")
-			require.Nil(t, err)
+			err := cli.AddUsers(context.Background(), name, "superSecretPassword", []string{"default"})
+			assert.NoError(t, err)
 			wg.Done()
 			done <- true
 		}(i)
@@ -322,11 +331,11 @@ func TestAddUsers(t *testing.T) {
 
 func TestAddRoles(t *testing.T) {
 	var count = 5
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	cli, err := client.New(context.Background(), cliTest)
@@ -339,7 +348,7 @@ func TestAddRoles(t *testing.T) {
 		go func(i int) {
 			name := strings.ReplaceAll(mockdata.NAMES[i], " ", "")
 			err := cli.AddRoles(context.Background(), name)
-			require.Nil(t, err)
+			assert.NoError(t, err)
 			wg.Done()
 			done <- true
 		}(i)
@@ -351,11 +360,11 @@ func TestAddRoles(t *testing.T) {
 
 func TestAddSecrets(t *testing.T) {
 	var count = 5
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	cli, err := client.New(context.Background(), cliTest)
@@ -369,7 +378,7 @@ func TestAddSecrets(t *testing.T) {
 			name := strings.ReplaceAll(mockdata.NAMES[i], " ", "")
 			value := strings.ReplaceAll(mockdata.NOUNS[i], " ", "")
 			err := cli.AddSecrets(context.Background(), name, value)
-			require.Nil(t, err)
+			assert.NoError(t, err)
 			wg.Done()
 			done <- true
 		}(i)
@@ -380,11 +389,11 @@ func TestAddSecrets(t *testing.T) {
 }
 
 func TestPolicyGrants(t *testing.T) {
-	if vaultToken == "" && vaultHost == "" {
+	if vaultToken == "" || vaultHost == "" {
 		t.Skip()
 	}
 
-	cliTest, err := getClientForTesting(ctxTest, client.DefaultAddress)
+	cliTest, err := getClientForTesting(ctxTest, "")
 	require.Nil(t, err)
 
 	d := &policyBuilder{

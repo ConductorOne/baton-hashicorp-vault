@@ -32,6 +32,9 @@ func (u *userBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	users, nextPageToken, err := u.client.ListAllUsers(ctx)
 	if err != nil {
+		if skippable(ctx, err, userResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
