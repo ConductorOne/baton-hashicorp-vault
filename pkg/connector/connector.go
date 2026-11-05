@@ -10,6 +10,7 @@ import (
 	"github.com/conductorone/baton-sdk/pkg/annotations"
 	"github.com/conductorone/baton-sdk/pkg/cli"
 	"github.com/conductorone/baton-sdk/pkg/connectorbuilder"
+	"github.com/conductorone/baton-sdk/pkg/uhttp"
 )
 
 type Connector struct {
@@ -49,9 +50,15 @@ func (d *Connector) Validate(ctx context.Context) (annotations.Annotations, erro
 	return nil, nil
 }
 
+// Close clears HTTP caches maintained by the Baton SDK.
+func (d *Connector) Close(ctx context.Context) error {
+	return uhttp.ClearCaches(ctx)
+}
+
 // New returns a new instance of the connector.
 func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) (connectorbuilder.ConnectorBuilderV2, []connectorbuilder.Opt, error) {
 	hcpClient := client.NewClient()
+	hcpClient.WithNamespace(config.VaultNamespace)
 
 	err := hcpClient.WithAddress(config.VaultHost)
 	if err != nil {
