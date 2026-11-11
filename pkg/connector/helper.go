@@ -38,6 +38,49 @@ func userResource(_ context.Context, user *client.APIResource, parentResourceID 
 	return ret, nil
 }
 
+// oidcUserResource builds a user from an entity's OIDC/JWT aliases. The entity
+// ID is the resource ID: it is stable, unlike the alias name or email.
+func oidcUserResource(entity *client.Entity) (*v2.Resource, error) {
+	aliases := oidcAliases(entity.Aliases)
+	if len(aliases) == 0 {
+		return nil, nil
+	}
+
+	email := oidcEmail(entity, aliases)
+	login := aliases[0].Name
+	displayName := entity.Name
+	if displayName == "" {
+		displayName = login
+	}
+
+	status := v2.UserTrait_Status_STATUS_ENABLED
+	if entity.Disabled {
+		status = v2.UserTrait_Status_STATUS_DISABLED
+	}
+
+	profile := map[string]interface{}{
+		"entity_id":  entity.ID,
+		"user_name":  login,
+		"mount_type": aliases[0].MountType,
+		"mount_path": aliases[0].MountPath,
+	}
+
+	if email != "" {
+		profile["email"] = email
+	}
+
+	traits := []rs.UserTraitOption{
+		rs.WithUserProfile(profile),
+		rs.WithStatus(status),
+		rs.WithUserLogin(login),
+	}
+	if email != "" {
+		traits = append(traits, rs.WithEmail(email, true))
+	}
+
+	return rs.NewUserResource(displayName, userResourceType, entity.ID, traits)
+}
+
 func roleResource(_ context.Context, role *client.APIResource) (*v2.Resource, error) {
 	profile := map[string]interface{}{
 		"id":         role.ID,
