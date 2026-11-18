@@ -8,6 +8,7 @@ type HashicorpVault struct {
 	VaultHost string `mapstructure:"vault-host"`
 	RoleId string `mapstructure:"role-id"`
 	SecretId string `mapstructure:"secret-id"`
+	SyncOidcUsers bool `mapstructure:"sync-oidc-users"`
 }
 
 func (c *HashicorpVault) findFieldByTag(tagValue string) (any, bool) {

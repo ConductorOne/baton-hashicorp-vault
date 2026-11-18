@@ -13,13 +13,14 @@ import (
 )
 
 type Connector struct {
-	client *client.HCPClient
+	client   *client.HCPClient
+	syncOIDC bool
 }
 
 // ResourceSyncers returns a ResourceSyncer for each resource type that should be synced from the upstream service.
 func (d *Connector) ResourceSyncers(_ context.Context) []connectorbuilder.ResourceSyncerV2 {
 	return []connectorbuilder.ResourceSyncerV2{
-		newUserBuilder(d.client),
+		newUserBuilder(d.client, d.syncOIDC),
 		newRoleBuilder(d.client),
 		newPolicyBuilder(d.client),
 		newSecretBuilder(d.client),
@@ -72,6 +73,7 @@ func New(ctx context.Context, config *cfg.HashicorpVault, _ *cli.ConnectorOpts) 
 	}
 
 	return &Connector{
-		client: hcpClient,
+		client:   hcpClient,
+		syncOIDC: config.SyncOidcUsers,
 	}, nil, nil
 }

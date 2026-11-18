@@ -147,3 +147,49 @@ type genericData struct {
 	KeyInfo map[string]group `json:"key_info,omitempty"`
 	Keys    []string         `json:"keys,omitempty"`
 }
+
+// Identity entity types. Vault has no native email attribute: OIDC/JWT logins
+// create an entity alias whose name is the user_claim value, and any other
+// claims are copied into the alias metadata only if the operator configured
+// claim_mappings on the role.
+
+// EntityListData is the data envelope of LIST identity/entity/id.
+type EntityListData struct {
+	Keys    []string              `json:"keys,omitempty"`
+	KeyInfo map[string]EntityInfo `json:"key_info,omitempty"`
+}
+
+// EntityInfo is the per-entity summary returned by the list endpoint.
+type EntityInfo struct {
+	Name     string        `json:"name,omitempty"`
+	Disabled bool          `json:"disabled,omitempty"`
+	Aliases  []EntityAlias `json:"aliases,omitempty"`
+}
+
+// EntityAlias links an entity to an identity in an auth mount.
+type EntityAlias struct {
+	ID             string            `json:"id,omitempty"`
+	Name           string            `json:"name,omitempty"`
+	MountType      string            `json:"mount_type,omitempty"`
+	MountPath      string            `json:"mount_path,omitempty"`
+	MountAccessor  string            `json:"mount_accessor,omitempty"`
+	Metadata       map[string]string `json:"metadata,omitempty"`
+	CustomMetadata map[string]string `json:"custom_metadata,omitempty"`
+}
+
+// Entity is the response of GET identity/entity/id/:id.
+type Entity struct {
+	ID       string            `json:"id,omitempty"`
+	Name     string            `json:"name,omitempty"`
+	Disabled bool              `json:"disabled,omitempty"`
+	Metadata map[string]string `json:"metadata,omitempty"`
+	Aliases  []EntityAlias     `json:"aliases,omitempty"`
+}
+
+type entityReadAPIData struct {
+	Data Entity `json:"data,omitempty"`
+}
+
+type entityListAPIData struct {
+	Data EntityListData `json:"data,omitempty"`
+}
