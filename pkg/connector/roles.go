@@ -6,7 +6,6 @@ import (
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
-	"github.com/conductorone/baton-sdk/pkg/annotations"
 	ent "github.com/conductorone/baton-sdk/pkg/types/entitlement"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
 )
@@ -37,6 +36,9 @@ func (r *roleBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId,
 
 	roles, nextPageToken, err := r.client.ListAllRoles(ctx)
 	if err != nil {
+		if skippable(ctx, err, roleResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -79,14 +81,6 @@ func (r *roleBuilder) Entitlements(_ context.Context, res *v2.Resource, _ rsType
 
 func (r *roleBuilder) Grants(_ context.Context, _ *v2.Resource, _ rsTypes.SyncOpAttrs) ([]*v2.Grant, *rsTypes.SyncOpResults, error) {
 	return nil, nil, nil
-}
-
-func (r *roleBuilder) Grant(ctx context.Context, principal *v2.Resource, entitlement *v2.Entitlement) ([]*v2.Grant, annotations.Annotations, error) {
-	return nil, nil, nil
-}
-
-func (r *roleBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotations.Annotations, error) {
-	return nil, nil
 }
 
 func newRoleBuilder(c *client.HCPClient) *roleBuilder {

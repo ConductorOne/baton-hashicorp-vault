@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sync/atomic"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
@@ -19,6 +20,10 @@ import (
 type policyBuilder struct {
 	resourceType *v2.ResourceType
 	client       *client.HCPClient
+	// userpassUnavailable is set once listing auth/userpass/users has failed
+	// with a skippable error, so later policies do not repeat the request or
+	// the warning.
+	userpassUnavailable atomic.Bool
 }
 
 func (p *policyBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
@@ -43,6 +48,9 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 
 	policies, nextPageToken, err := p.client.ListAllPolicies(ctx)
 	if err != nil {
+		if skippable(ctx, err, policyResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -51,7 +59,7 @@ func (p *policyBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		return nil, nil, err
 	}
 
-	for _, policy := range policies.Data.Policies {
+	for _, policy := range policies.Names() {
 		ur, err := policyResource(ctx, &client.APIResource{
 			ID:        policy,
 			Name:      policy,
@@ -88,13 +96,24 @@ func (p *policyBuilder) Grants(ctx context.Context, res *v2.Resource, opts rsTyp
 		err error
 		rv  []*v2.Grant
 	)
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	bag, _, err := getToken(&opts.PageToken, policyResourceType)
 	if err != nil {
 		return nil, nil, err
 	}
 
+	if p.userpassUnavailable.Load() {
+		return nil, &rsTypes.SyncOpResults{}, nil
+	}
+
 	users, nextPageToken, err := p.client.ListAllUsers(ctx)
 	if err != nil {
+		if skippable(ctx, err, policyResourceType.Id) {
+			p.userpassUnavailable.Store(true)
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -104,8 +123,15 @@ func (p *policyBuilder) Grants(ctx context.Context, res *v2.Resource, opts rsTyp
 	}
 
 	for _, user := range users.Data.Keys {
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		userInfo, err := p.client.GetUser(ctx, user)
 		if err != nil {
+			if client.IsNotFound(err) || client.IsNoRoute(err) || client.IsPermissionDenied(err) {
+				ctxzap.Extract(ctx).Warn("baton-hashicorp-vault: skipping user while listing policy grants", zap.String("user_name", user), zap.Error(err))
+				continue
+			}
 			return nil, nil, err
 		}
 

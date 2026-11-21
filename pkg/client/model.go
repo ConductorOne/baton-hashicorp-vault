@@ -2,6 +2,12 @@ package client
 
 import "time"
 
+// KVMount describes a Vault KV engine discovered from sys/mounts.
+type KVMount struct {
+	Path    string
+	Version int
+}
+
 type auth struct {
 	bearerToken string
 	roleID      string
@@ -23,6 +29,19 @@ type appRoleAuth struct {
 	LeaseDuration int    `json:"lease_duration"`
 }
 
+// TokenInfo describes the token returned by Vault's lookup-self endpoint.
+type TokenInfo struct {
+	DisplayName   string   `json:"display_name"`
+	Policies      []string `json:"policies"`
+	TTL           int      `json:"ttl"`
+	Renewable     bool     `json:"renewable"`
+	NamespacePath string   `json:"namespace_path"`
+}
+
+type tokenLookupSelfResponse struct {
+	Data TokenInfo `json:"data"`
+}
+
 type CommonAPIData struct {
 	RequestID string `json:"request_id,omitempty"`
 	Data      Data   `json:"data,omitempty"`
@@ -37,6 +56,9 @@ type APIResource struct {
 	ID        string `json:"id,omitempty"`
 	Name      string `json:"name,omitempty"`
 	MountType string `json:"mount_type,omitempty"`
+	Mount     string `json:"mount,omitempty"`
+	KVVersion int    `json:"kv_version,omitempty"`
+	Path      string `json:"path,omitempty"`
 }
 
 type PolicyAPIData struct {
@@ -50,6 +72,19 @@ type PolicyAPIData struct {
 type PolicyData struct {
 	Keys     []string `json:"keys,omitempty"`
 	Policies []string `json:"policies,omitempty"`
+}
+
+// Names returns policy names from the first populated Vault response shape.
+func (p *PolicyAPIData) Names() []string {
+	if p == nil {
+		return nil
+	}
+	for _, names := range [][]string{p.Data.Keys, p.Data.Policies, p.Keys, p.Policies} {
+		if len(names) > 0 {
+			return names
+		}
+	}
+	return nil
 }
 
 type UserAPIData struct {
@@ -70,52 +105,8 @@ type UserData struct {
 	TokenType            string   `json:"token_type,omitempty"`
 }
 
-type bodyUsers struct {
-	Password        string   `json:"password"`
-	TokenPolicies   []string `json:"token_policies"`
-	TokenBoundCidrs []string `json:"token_bound_cidrs"`
-}
-
-type bodyRoles struct {
-	TokenType     string   `json:"token_type"`
-	TokenTTL      string   `json:"token_ttl"`
-	TokenMaxTTL   string   `json:"token_max_ttl"`
-	TokenPolicies []string `json:"token_policies"`
-	Period        int      `json:"period"`
-	BindSecretID  bool     `json:"bind_secret_id"`
-}
-
-type BodyEnableAuth struct {
-	Type string `json:"type"`
-}
-
 type bodyUpdateUserPolicy struct {
 	TokenPolicies []string `json:"token_policies"`
-}
-
-type BodySecret struct {
-	Type                  string  `json:"type"`
-	Description           string  `json:"description"`
-	Config                Config  `json:"config"`
-	Local                 bool    `json:"local"`
-	SealWrap              bool    `json:"seal_wrap"`
-	ExternalEntropyAccess bool    `json:"external_entropy_access"`
-	Options               Options `json:"options"`
-}
-
-type Config struct {
-	Options         interface{} `json:"options"`
-	DefaultLeaseTTL string      `json:"default_lease_ttl"`
-	MaxLeaseTTL     string      `json:"max_lease_ttl"`
-	ForceNoCache    bool        `json:"force_no_cache"`
-}
-
-type Options struct {
-	Version string `json:"version"`
-}
-
-type bodySecrets struct {
-	MyValue string `json:"my-value"`
 }
 
 type authMethodsAPIData struct {

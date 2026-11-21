@@ -30,6 +30,9 @@ func (a *authMethodBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 
 	authMethods, nextPageToken, err := a.client.ListAllAuthenticationMethods(ctx)
 	if err != nil {
+		if skippable(ctx, err, authMethodResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
 
@@ -40,8 +43,8 @@ func (a *authMethodBuilder) List(ctx context.Context, parentResourceID *v2.Resou
 
 	for method := range authMethods.Data {
 		ur, err := authMethodResource(ctx, &client.APIResource{
-			ID:   removeTrailingSlash(method),
-			Name: removeTrailingSlash(method),
+			ID:   trimTrailingSlash(method),
+			Name: trimTrailingSlash(method),
 		})
 		if err != nil {
 			return nil, nil, err

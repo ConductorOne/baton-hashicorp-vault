@@ -2,11 +2,17 @@ package connector
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/conductorone/baton-hashicorp-vault/pkg/client"
 	v2 "github.com/conductorone/baton-sdk/pb/c1/connector/v2"
+	"github.com/conductorone/baton-sdk/pkg/pagination"
 	rsTypes "github.com/conductorone/baton-sdk/pkg/types/resource"
+	"github.com/grpc-ecosystem/go-grpc-middleware/logging/zap/ctxzap"
+	"go.uber.org/zap"
 )
+
+const maxSecretDepth = 10
 
 type secretBuilder struct {
 	resourceType *v2.ResourceType
@@ -18,31 +24,59 @@ func (s *secretBuilder) ResourceType(ctx context.Context) *v2.ResourceType {
 }
 
 func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceId, opts rsTypes.SyncOpAttrs) ([]*v2.Resource, *rsTypes.SyncOpResults, error) {
-	var (
-		err error
-		rv  []*v2.Resource
-	)
-
-	bag, _, err := getToken(&opts.PageToken, secretResourceType)
-	if err != nil {
-		return nil, nil, err
+	bag := &pagination.Bag{}
+	if err := bag.Unmarshal(opts.PageToken.Token); err != nil {
+		return nil, nil, fmt.Errorf("baton-hashicorp-vault: failed to unmarshal pagination token: %w", err)
+	}
+	if bag.Current() == nil {
+		bag.Push(pagination.PageState{ResourceTypeID: secretResourceType.Id})
 	}
 
-	secrets, nextPageToken, err := s.client.ListAllSecrets(ctx, bag.Current().Token)
+	mounts, err := s.client.ListKVMounts(ctx)
 	if err != nil {
+		if skippable(ctx, err, secretResourceType.Id) {
+			return nil, &rsTypes.SyncOpResults{}, nil
+		}
 		return nil, nil, err
 	}
-
-	err = bag.Next(nextPageToken)
-	if err != nil {
-		return nil, nil, err
+	if len(mounts) == 0 {
+		return nil, &rsTypes.SyncOpResults{}, nil
 	}
 
-	for _, secret := range secrets.Data.Keys {
+	index := 0
+	if token := bag.Current().Token; token != "" {
+		index = -1
+		for i, mount := range mounts {
+			if mount.Path == token {
+				index = i
+				break
+			}
+		}
+		if index == -1 {
+			return nil, nil, fmt.Errorf("baton-hashicorp-vault: unknown KV mount %q in pagination token", token)
+		}
+	}
+
+	mount := mounts[index]
+	paths, err := s.client.ListSecretPaths(ctx, mount, maxSecretDepth)
+	if err != nil {
+		if skippable(ctx, err, secretResourceType.Id) {
+			ctxzap.Extract(ctx).Warn("baton-hashicorp-vault: skipping KV mount", zap.String("mount", mount.Path), zap.Error(err))
+			paths = nil
+		} else {
+			return nil, nil, err
+		}
+	}
+
+	rv := make([]*v2.Resource, 0, len(paths))
+	for _, path := range paths {
+		name := mount.Path + path
 		ur, err := secretResource(ctx, &client.APIResource{
-			ID:        secret,
-			Name:      secret,
-			MountType: secrets.MountType,
+			ID:        name,
+			Name:      name,
+			Mount:     mount.Path,
+			KVVersion: mount.Version,
+			Path:      path,
 		})
 		if err != nil {
 			return nil, nil, err
@@ -50,7 +84,14 @@ func (s *secretBuilder) List(ctx context.Context, parentResourceID *v2.ResourceI
 		rv = append(rv, ur)
 	}
 
-	nextPageToken, err = bag.Marshal()
+	nextMount := ""
+	if index+1 < len(mounts) {
+		nextMount = mounts[index+1].Path
+	}
+	if err := bag.Next(nextMount); err != nil {
+		return nil, nil, err
+	}
+	nextPageToken, err := bag.Marshal()
 	if err != nil {
 		return nil, nil, err
 	}
