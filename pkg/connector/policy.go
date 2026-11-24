@@ -148,7 +148,7 @@ func (p *policyBuilder) Grant(ctx context.Context, principal *v2.Resource, entit
 	userId := principal.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
 	if errors.Is(err, client.ErrNotFound) {
-		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy grants are only supported for userpass users (OIDC/JWT users are sync-only)", userId)
+		return nil, nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy grants support userpass users only (OIDC/JWT users are sync-only)", userId)
 	}
 	if err != nil {
 		return nil, nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy grant: %w", userId, err)
@@ -190,7 +190,7 @@ func (p *policyBuilder) Revoke(ctx context.Context, grant *v2.Grant) (annotation
 	policyId := entitlement.Resource.Id.Resource
 	userInfo, err := p.client.GetUser(ctx, userId)
 	if errors.Is(err, client.ErrNotFound) {
-		return nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy revokes are only supported for userpass users (OIDC/JWT users are sync-only)", userId)
+		return nil, status.Errorf(codes.InvalidArgument, "baton-hashicorp-vault: userpass user %q not found; policy revokes support userpass users only (OIDC/JWT users are sync-only)", userId)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("baton-hashicorp-vault: failed to get user %q for policy revoke: %w", userId, err)

@@ -13,23 +13,20 @@ import (
 )
 
 func userResource(_ context.Context, user *client.APIResource, parentResourceID *v2.ResourceId) (*v2.Resource, error) {
-	userStatus := v2.UserTrait_Status_STATUS_ENABLED
+	userStatus := v2.Status_RESOURCE_STATUS_ENABLED
 	profile := map[string]interface{}{
 		"user_id":    user.ID,
 		"user_name":  user.Name,
 		"mount_type": user.MountType,
 	}
 
-	userTraits := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-		rs.WithStatus(userStatus),
-	}
-
 	ret, err := rs.NewUserResource(
 		user.Name,
 		userResourceType,
 		user.ID,
-		userTraits,
+		nil,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(userStatus, ""),
 		rs.WithParentResourceID(parentResourceID))
 	if err != nil {
 		return nil, err
@@ -53,9 +50,9 @@ func oidcUserResource(entity *client.Entity) (*v2.Resource, error) {
 		displayName = login
 	}
 
-	status := v2.UserTrait_Status_STATUS_ENABLED
+	status := v2.Status_RESOURCE_STATUS_ENABLED
 	if entity.Disabled {
-		status = v2.UserTrait_Status_STATUS_DISABLED
+		status = v2.Status_RESOURCE_STATUS_DISABLED
 	}
 
 	profile := map[string]interface{}{
@@ -70,15 +67,20 @@ func oidcUserResource(entity *client.Entity) (*v2.Resource, error) {
 	}
 
 	traits := []rs.UserTraitOption{
-		rs.WithUserProfile(profile),
-		rs.WithStatus(status),
 		rs.WithUserLogin(login),
 	}
 	if email != "" {
 		traits = append(traits, rs.WithEmail(email, true))
 	}
 
-	return rs.NewUserResource(displayName, userResourceType, entity.ID, traits)
+	return rs.NewUserResource(
+		displayName,
+		userResourceType,
+		entity.ID,
+		traits,
+		rs.WithResourceProfile(profile),
+		rs.WithResourceStatus(status, ""),
+	)
 }
 
 func roleResource(_ context.Context, role *client.APIResource) (*v2.Resource, error) {
@@ -88,11 +90,7 @@ func roleResource(_ context.Context, role *client.APIResource) (*v2.Resource, er
 		"mount_type": role.MountType,
 	}
 
-	roleTraitOptions := []rs.RoleTraitOption{
-		rs.WithRoleProfile(profile),
-	}
-
-	resource, err := rs.NewRoleResource(role.Name, roleResourceType, role.ID, roleTraitOptions)
+	resource, err := rs.NewRoleResource(role.Name, roleResourceType, role.ID, nil, rs.WithResourceProfile(profile))
 	if err != nil {
 		return nil, err
 	}
@@ -108,10 +106,7 @@ func policyResource(_ context.Context, policy *client.APIResource) (*v2.Resource
 		"mount_type": policy.MountType,
 	}
 
-	policyTraitOptions := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	opts = append(opts, rs.WithAppTrait(), rs.WithResourceProfile(profile))
 	resource, err := rs.NewResource(
 		policy.Name,
 		policyResourceType,
@@ -133,10 +128,7 @@ func secretResource(_ context.Context, secret *client.APIResource) (*v2.Resource
 		"mount_type": secret.MountType,
 	}
 
-	policyTraitOptions := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	opts = append(opts, rs.WithAppTrait(), rs.WithResourceProfile(profile))
 	resource, err := rs.NewResource(
 		secret.Name,
 		secretResourceType,
@@ -156,15 +148,12 @@ func groupResource(_ context.Context, group *client.APIResource) (*v2.Resource, 
 		"group_id":   group.ID,
 	}
 
-	groupTraitOptions := []rs.GroupTraitOption{
-		rs.WithGroupProfile(profile),
-	}
-
 	resource, err := rs.NewGroupResource(
 		group.Name,
 		groupResourceType,
 		group.ID,
-		groupTraitOptions,
+		nil,
+		rs.WithResourceProfile(profile),
 	)
 
 	if err != nil {
@@ -226,10 +215,7 @@ func authMethodResource(_ context.Context, secret *client.APIResource) (*v2.Reso
 		"name": secret.Name,
 	}
 
-	policyTraitOptions := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	opts = append(opts, rs.WithAppTrait(), rs.WithResourceProfile(profile))
 	resource, err := rs.NewResource(
 		secret.Name,
 		authMethodResourceType,
@@ -250,10 +236,7 @@ func entityResource(_ context.Context, entity *client.APIResource) (*v2.Resource
 		"name": entity.Name,
 	}
 
-	policyTraitOptions := []rs.AppTraitOption{
-		rs.WithAppProfile(profile),
-	}
-	opts = append(opts, rs.WithAppTrait(policyTraitOptions...))
+	opts = append(opts, rs.WithAppTrait(), rs.WithResourceProfile(profile))
 	resource, err := rs.NewResource(
 		entity.Name,
 		entityResourceType,
